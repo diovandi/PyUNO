@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import random
+from uno_classes import Game, Player, Card
 
 pygame.init()
 
@@ -19,8 +20,6 @@ BLACK = (0, 0, 0)
 RED = (200, 0, 0)
 BRIGHT_RED = (255, 0, 0)
 
-game_state = "start_menu"
-
 def draw_text(text, font, color, surface, x, y):
     textobj = font.render(text, 1, color)
     textrect = textobj.get_rect()
@@ -28,10 +27,9 @@ def draw_text(text, font, color, surface, x, y):
     surface.blit(textobj, textrect)
 
 def start_menu():
-    global game_state, screen
+    global screen
 
-    while game_state == "start_menu":
-
+    while True:
         current_width = screen.get_width()
         current_height = screen.get_height()
 
@@ -70,20 +68,18 @@ def start_menu():
         # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                return False
             
             if event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and start_button.collidepoint((mouse_x, mouse_y)):
-                    game_state = "in_game"
+                    return True
             
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                     pygame.quit()
-                     sys.exit()
+                    return False
 
         pygame.display.update()
 
@@ -125,7 +121,7 @@ def load_card_images(card_width, card_height):
 
     return card_images
 
-def main_game():
+def main_game_ui(game: Game):
     global screen
 
     # Game Setup
@@ -135,40 +131,6 @@ def main_game():
     
     status_font = pygame.font.Font('fonts/Fishcrispy.otf', int(screen.get_height() * 0.03))
     button_font = pygame.font.Font('fonts/Chunq.ttf', int(screen.get_height() * 0.035))
-
-    full_deck = []
-    COLORS = ["red", "yellow", "green", "blue"]
-    VALUES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
-    
-    for color in COLORS:
-        full_deck.append(f"{color}_0")
-        for _ in range(2):
-            for value in VALUES:
-                full_deck.append(f"{color}_{value}")
-
-    for _ in range(4): # Four of each wild card
-        full_deck.append("wild_standard")
-        full_deck.append("wild_drawfour")
-
-    # Shuffle the deck
-    random.shuffle(full_deck)
-
-    # Deal 7 cards to each player
-    player1_hand = [full_deck.pop() for _ in range(7)]
-    player2_hand = [full_deck.pop() for _ in range(7)]
-    player3_hand = [full_deck.pop() for _ in range(7)]
-    player4_hand = [full_deck.pop() for _ in range(7)]
-
-    # Setup the discard pile
-    discard_pile = []
-    # Flip cards from the deck to the discard pile until a non-wild card is found
-    while True:
-        top_card = full_deck.pop()
-        if 'wild' not in top_card:
-            discard_pile.append(top_card)
-            break
-        else:
-            full_deck.insert(0, top_card)
 
     # Game Loop
     running = True
@@ -184,11 +146,37 @@ def main_game():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Handle card selection for current player
+                    current_player = game.get_current_player()
+                    if current_player == game.players[0]:  # Human player
+                        # Check if a card was clicked
+                        for i, card in enumerate(current_player.hand):
+                            card_rect = pygame.Rect(
+                                current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
+                                current_height - card_height - 20,
+                                card_width,
+                                card_height
+                            )
+                            if card_rect.collidepoint(mouse_pos):
+                                if game.play_card(current_player, card):
+                                    break
+                        # Check if draw pile was clicked
+                        draw_pile_rect = pygame.Rect(
+                            current_width/2 + card_width * 0.2,
+                            current_height/2 - card_height/2,
+                            card_width,
+                            card_height
+                        )
+                        if draw_pile_rect.collidepoint(mouse_pos):
+                            game.draw_card(current_player)
 
         screen.fill(RED)
 
         # Status Update Box
-        status_text = "Player 1's Turn. Choose a card to play."
+        current_player = game.get_current_player()
+        status_text = f"{current_player.name}'s Turn"
         text_surface = status_font.render(status_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.28))
         bg_rect = text_rect.copy().inflate(20, 10)
@@ -204,77 +192,74 @@ def main_game():
         screen.blit(CARD_IMAGES['card_back'], draw_pile_pos)
         draw_text("DRAW", button_font, (255, 255, 255), screen, draw_pile_pos[0] + card_width/2, draw_pile_pos[1] + card_height + 20)
         
-        if discard_pile:
-             screen.blit(CARD_IMAGES[discard_pile[-1]], discard_pile_pos)
+        top_card = game.deck.get_top_card()
+        if top_card:
+            screen.blit(CARD_IMAGES[str(top_card)], discard_pile_pos)
 
-        # Define card spacing and padding
-        card_spacing = card_width * 0.6
-        padding = 20
+        # Draw player hands
+        for i, player in enumerate(game.players):
+            if i == 0:  # Human player (bottom)
+                for j, card in enumerate(player.hand):
+                    card_y = current_height - card_height - 20
+                    if pygame.Rect(
+                        current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
+                        card_y,
+                        card_width,
+                        card_height
+                    ).collidepoint(mouse_pos):
+                        card_y -= 20
+                    screen.blit(CARD_IMAGES[str(card)], (
+                        current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
+                        card_y
+                    ))
+            else:  # AI players
+                rotated_card = pygame.transform.rotate(CARD_IMAGES['card_back'], 90 * (i - 1))
+                for j in range(len(player.hand)):
+                    if i == 1:  # Left
+                        screen.blit(rotated_card, (20, current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6))
+                    elif i == 2:  # Top
+                        screen.blit(CARD_IMAGES['card_back'], (
+                            current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
+                            20
+                        ))
+                    else:  # Right
+                        screen.blit(rotated_card, (
+                            current_width - card_height - 20,
+                            current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6
+                        ))
 
-        # Player 1 (Bottom)
-        player1_card_rects = []
-        hand_width = (len(player1_hand) - 1) * card_spacing + card_width
-        start_x = current_width / 2 - hand_width / 2
-        
-        for i, card_name in enumerate(player1_hand):
-            card_rect = pygame.Rect(start_x + i * card_spacing, current_height - card_height - padding, card_width, card_height)
-            player1_card_rects.append(card_rect)
-
-        # Determine which card is being hovered over
-        hovered_card_index = None
-        # Iterate in reverse order so the top-most card is detected first
-        for i in range(len(player1_card_rects) - 1, -1, -1):
-            if player1_card_rects[i].collidepoint(mouse_pos):
-                hovered_card_index = i
-                break
-        # Apply the hover effect
-        for i, card_name in enumerate(player1_hand):
-            card_y = current_height - card_height - padding
-            # If this card is the one being hovered over, draw it lifted up
-            if i == hovered_card_index:
-                card_y -= 20
-            screen.blit(CARD_IMAGES[card_name], (player1_card_rects[i].x, card_y))
-
-        # Player 2 (Left)
-        hand_height = (len(player2_hand) - 1) * card_spacing + card_height
-        start_y = current_height / 2 - hand_height / 2
-        for i, card_name in enumerate(player2_hand):
-            rotated_card = pygame.transform.rotate(CARD_IMAGES['card_back'], 90)
-            screen.blit(rotated_card, (padding, start_y + i * card_spacing))
-            
-        # Player 3 (Top)
-        hand_width = (len(player3_hand) - 1) * card_spacing + card_width
-        start_x = current_width / 2 - hand_width / 2
-        for i, card_name in enumerate(player3_hand):
-            # REVISED: Drawing card_back at normal size
-            screen.blit(CARD_IMAGES['card_back'], (start_x + i * card_spacing, padding))
-
-        # Player 4 (Right)
-        hand_height = (len(player4_hand) - 1) * card_spacing + card_height
-        start_y = current_height / 2 - hand_height / 2
-        for i, card_name in enumerate(player4_hand):
-            rotated_card = pygame.transform.rotate(CARD_IMAGES['card_back'], -90)
-            card_x = current_width - card_height - padding
-            screen.blit(rotated_card, (card_x, start_y + i * card_spacing))
-            
         # UNO Button
         button_width = 120
         button_height = 50
         button_center_x = current_width * 0.7
-        button_center_y = current_height - padding - (card_height/2)
+        button_center_y = current_height - 20 - (card_height/2)
 
         uno_button_rect = pygame.Rect(0, 0, button_width, button_height)
         uno_button_rect.center = (button_center_x, button_center_y)
 
         pygame.draw.rect(screen, (BLACK), uno_button_rect, border_radius=10)
         draw_text("UNO!", button_font, (WHITE), screen, uno_button_rect.centerx, uno_button_rect.centery)
+
+        # Check for winner
+        winner = game.check_winner()
+        if winner:
+            status_text = f"{winner.name} wins!"
+            text_surface = status_font.render(status_text, True, (255, 255, 255))
+            text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.28))
+            bg_rect = text_rect.copy().inflate(20, 10)
+            bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 150))
+            screen.blit(bg_surface, bg_rect)
+            screen.blit(text_surface, text_rect)
+            pygame.display.flip()
+            pygame.time.wait(3000)  # Wait 3 seconds
+            running = False
+
         pygame.display.flip()
         
     pygame.quit()
     sys.exit()
 
 if __name__ == '__main__':
-    if game_state == "start_menu":
-        start_menu()
-    
-    main_game()
+    if start_menu():
+        main_game_ui()
