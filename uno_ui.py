@@ -36,7 +36,7 @@ def start_menu():
         screen.fill(BLACK)
 
         # Dynamic Logo Sizing
-        logo_height = int(current_height * 0.3)
+        logo_height = int(current_height * 0.5)
         logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
         uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
         logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
@@ -231,8 +231,8 @@ def main_game_ui(game: Game):
         # UNO Button
         button_width = 120
         button_height = 50
-        button_center_x = current_width * 0.7
-        button_center_y = current_height - 20 - (card_height/2)
+        button_center_x = current_width / 2
+        button_center_y = current_height - card_height - 70
 
         uno_button_rect = pygame.Rect(0, 0, button_width, button_height)
         uno_button_rect.center = (button_center_x, button_center_y)
