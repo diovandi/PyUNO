@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import random
+import time
 from uno_classes import Game, Player, Card
 
 pygame.init()
@@ -134,9 +135,19 @@ def main_game_ui(game: Game):
 
     # Game Loop
     running = True
+    last_ai_turn_time = 0
+    ai_turn_delay = 1.0  # Delay in seconds between AI turns
+
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
         mouse_pos = pygame.mouse.get_pos()
+
+        # Handle AI turns with delay
+        if game.is_ai_turn and not game.waiting_for_color:
+            current_time = time.time()
+            if current_time - last_ai_turn_time >= ai_turn_delay:
+                game.handle_ai_turn()
+                last_ai_turn_time = current_time
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
