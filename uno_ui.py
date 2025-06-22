@@ -3,6 +3,7 @@ import sys
 import os
 import time
 from uno_classes import Game, Player, Card
+from font_config import get_font_config
 
 pygame.init()
 
@@ -19,6 +20,71 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (200, 0, 0)
 BRIGHT_RED = (255, 0, 0)
+
+def get_font_path(font_filename):
+    """
+    Get the absolute path to a font file in the fonts directory
+    """
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Join with fonts directory and filename
+    return os.path.join(script_dir, 'fonts', font_filename)
+
+def load_font_safe(font_path, size, fallback_font=None):
+    """
+    Safely load a font with fallback options
+    Args:
+        font_path: Path to the custom font file (relative or absolute)
+        size: Font size
+        fallback_font: Optional specific fallback font name
+    Returns:
+        pygame.font.Font object
+    """
+    # If it's a relative path starting with 'fonts/', convert to absolute path
+    if font_path.startswith('fonts/'):
+        font_filename = font_path.replace('fonts/', '')
+        font_path = get_font_path(font_filename)
+    
+    try:
+        # Try to load the custom font
+        if os.path.exists(font_path):
+            return pygame.font.Font(font_path, size)
+        else:
+            print(f"Warning: Font file '{font_path}' not found. Using fallback.")
+    except pygame.error as e:
+        print(f"Warning: Could not load font '{font_path}': {e}. Using fallback.")
+    
+    # Fallback options
+    try:
+        if fallback_font:
+            # Try specific fallback font
+            return pygame.font.SysFont(fallback_font, size)
+    except:
+        pass
+    
+    # Try common system fonts as fallbacks
+    fallback_fonts = ['arial', 'helvetica', 'calibri', 'segoeui', 'trebuchetms']
+    for font_name in fallback_fonts:
+        try:
+            return pygame.font.SysFont(font_name, size)
+        except:
+            continue
+    
+    # Last resort: use default pygame font
+    return pygame.font.Font(None, size)
+
+def load_font_by_type(font_type, size):
+    """
+    Load a font using the font configuration system
+    Args:
+        font_type: Type of font from font_config ('credit', 'title', etc.)
+        size: Font size
+    Returns:
+        pygame.font.Font object
+    """
+    config = get_font_config(font_type)
+    font_path = get_font_path(config['file'])
+    return load_font_safe(font_path, size, config['fallback'])
 
 def draw_text(text, font, color, surface, x, y):
     textobj = font.render(text, 1, color)
@@ -42,7 +108,7 @@ def start_menu():
         screen.blit(uno_logo_scaled, logo_rect)
         
         credit_font_size = int(current_height * 0.04)
-        credit_font = pygame.font.Font('fonts/Baksosapi.otf', credit_font_size)
+        credit_font = load_font_by_type('credit', credit_font_size)
 
         button_width = int(current_width * 0.25)
         button_height = int(current_height * 0.12)
@@ -51,7 +117,7 @@ def start_menu():
         start_button = pygame.Rect(button_x, button_y, button_width, button_height)
         
         start_font_size = int(button_height * 0.6)
-        start_font = pygame.font.Font('fonts/Arcadeclassic.ttf', start_font_size)
+        start_font = load_font_by_type('start_button', start_font_size)
 
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
 
@@ -127,7 +193,7 @@ def draw_color_selection_menu(screen, current_width, current_height, button_font
     overlay.fill((0, 0, 0, 128))
     screen.blit(overlay, (0, 0))
     
-    title_font = pygame.font.Font('fonts/Fishcrispy.otf', int(current_height * 0.05))
+    title_font = load_font_by_type('title', int(current_height * 0.05))
     draw_text("Choose a Color", title_font, WHITE, screen, current_width/2, current_height * 0.3)
     
     button_size = int(current_width * 0.1)
@@ -169,11 +235,11 @@ def main_game_ui(game):
         card_height = int(card_width * 1.45)
         CARD_IMAGES = load_card_images(card_width, card_height)
         
-        status_font = pygame.font.Font('fonts/Fishcrispy.otf', int(current_height * 0.03))
-        button_font = pygame.font.Font('fonts/Chunq.ttf', int(current_height * 0.035))
+        status_font = load_font_by_type('status', int(current_height * 0.03))
+        button_font = load_font_by_type('button', int(current_height * 0.035))
         uno_font_size = int(current_height * 0.04)
-        uno_button_font = pygame.font.Font('fonts/Chunq.ttf', uno_font_size)
-        winner_font = pygame.font.Font('fonts/Fishcrispy.otf', int(current_height * 0.05))
+        uno_button_font = load_font_by_type('button', uno_font_size)
+        winner_font = load_font_by_type('winner', int(current_height * 0.05))
 
         mouse_pos = pygame.mouse.get_pos()
         current_time = time.time()
