@@ -1,8 +1,6 @@
-
 import pygame
 import sys
 import os
-import random
 import time
 
 pygame.init()
@@ -167,7 +165,7 @@ def main_game_ui(game):
         button_font = pygame.font.Font('fonts/Chunq.ttf', int(current_height * 0.035))
         uno_font_size = int(current_height * 0.04)
         uno_button_font = pygame.font.Font('fonts/Chunq.ttf', uno_font_size)
-        winner_font = pygame.font.Font('fonts/Fishcrispy.otf', int(current_height * 0.05)) # Larger font for winner
+        winner_font = pygame.font.Font('fonts/Fishcrispy.otf', int(current_height * 0.05))
 
         mouse_pos = pygame.mouse.get_pos()
         current_time = time.time()
@@ -215,27 +213,35 @@ def main_game_ui(game):
                     else:
                         current_player = game.get_current_player()
                         if current_player == game.players[0]:
-                            for i, card in enumerate(current_player.hand):
-                                card_rect = pygame.Rect(
-                                    current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
-                                    current_height - card_height - 20,
+                            hovered_card_to_play_index = -1
+                            base_y_for_human_click_detection = current_height - card_height - 20
+
+                            for j in range(len(current_player.hand) - 1, -1, -1):
+                                card_rect_for_click = pygame.Rect(
+                                    current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
+                                    base_y_for_human_click_detection,
                                     card_width,
                                     card_height
                                 )
-                                if card_rect.collidepoint(mouse_pos):
-                                    if game.play_card(current_player, card):
-                                        if card.value in ["drawtwo", "drawfour"]:
-                                            next_player = game.players[(game.current_player_index + game.direction) % len(game.players)]
-                                            if next_player == game.players[0]:
-                                                cards_to_draw = 2 if card.value == "drawtwo" else 4
-                                                for _ in range(cards_to_draw):
-                                                    game.draw_card(next_player)
-                                                draw_message = f"Drew {cards_to_draw} cards!"
-                                                draw_message_time = current_time
-                                        if game.is_ai_turn:
-                                            last_turn_time = current_time
-                                            waiting_for_turn = True
-                                        break
+                                if card_rect_for_click.collidepoint(mouse_pos):
+                                    hovered_card_to_play_index = j
+                                    break
+                            
+                            if hovered_card_to_play_index != -1:
+                                card_to_play = current_player.hand[hovered_card_to_play_index]
+                                if game.play_card(current_player, card_to_play):
+                                    if card_to_play.value in ["drawtwo", "drawfour"]:
+                                        next_player = game.players[(game.current_player_index + game.direction) % len(game.players)]
+                                        if next_player == game.players[0]:
+                                            cards_to_draw = 2 if card_to_play.value == "drawtwo" else 4
+                                            for _ in range(cards_to_draw):
+                                                game.draw_card(next_player)
+                                            draw_message = f"Drew {cards_to_draw} cards!"
+                                            draw_message_time = current_time
+                                    if game.is_ai_turn:
+                                        last_turn_time = current_time
+                                        waiting_for_turn = True
+                                        
                         if uno_button_rect.collidepoint(mouse_pos):
                             print("UNO button clicked!")
 
@@ -288,50 +294,75 @@ def main_game_ui(game):
 
         for i, player in enumerate(game.players):
             is_current_player = player == current_player
-            highlight_offset = 20 if is_current_player else 0
             
             if i == 0:
-                for j, card in enumerate(player.hand):
-                    card_y = current_height - card_height - 20 - highlight_offset
-                    if pygame.Rect(
+                hovered_card_index = -1 
+                base_y_for_card_row = current_height - card_height - 20 
+
+                for j in range(len(player.hand) - 1, -1, -1):
+                    card_rect_for_hover = pygame.Rect(
                         current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
-                        card_y,
+                        base_y_for_card_row,
                         card_width,
                         card_height
-                    ).collidepoint(mouse_pos):
-                        card_y -= 20
+                    )
+                    if card_rect_for_hover.collidepoint(mouse_pos) and is_current_player:
+                        hovered_card_index = j 
+                        break 
+
+                for j, card in enumerate(player.hand):
+                    card_draw_y = base_y_for_card_row
+                    
+                    if is_current_player:
+                        card_draw_y -= 20
+
+                    if j == hovered_card_index:
+                        card_draw_y -= 20
+     
                     screen.blit(CARD_IMAGES[str(card)], (
                         current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
-                        card_y
+                        card_draw_y 
                     ))
+                    
                     if is_current_player:
                         highlight_rect = pygame.Rect(
                             current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6 - 5,
-                            card_y - 5,
+                            card_draw_y - 5, 
                             card_width + 10,
                             card_height + 10
                         )
                         pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
-            else:
+            else:  
+                current_player_shift_x = 0
+                current_player_shift_y = 0
+
+                if is_current_player:
+                    if i == 1: # Left AI Player: move right (towards center)
+                        current_player_shift_x = 20
+                    elif i == 2: # Top AI Player: move down (towards center)
+                        current_player_shift_y = 20
+                    else: # i == 3, Right AI Player: move left (towards center)
+                        current_player_shift_x = -20 
+
                 for j in range(len(player.hand)):
-                    if i == 1:
+                    if i == 1: # Left
                         rotated_card = pygame.transform.rotate(CARD_IMAGES['card_back'], -90)
-                        pos = (20 - highlight_offset, current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6)
+                        pos = (20 + current_player_shift_x, current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6 + current_player_shift_y)
                         screen.blit(rotated_card, pos)
                         if is_current_player:
                             highlight_rect = pygame.Rect(pos[0] - 5, pos[1] - 5, card_height + 10, card_width + 10)
                             pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
-                    elif i == 2:
-                        pos = (current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6,
-                               20 - highlight_offset)
+                    elif i == 2: # Top
+                        pos = (current_width/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6 + current_player_shift_x,
+                               20 + current_player_shift_y)
                         screen.blit(CARD_IMAGES['card_back'], pos)
                         if is_current_player:
                             highlight_rect = pygame.Rect(pos[0] - 5, pos[1] - 5, card_width + 10, card_height + 10)
                             pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
-                    else:
+                    else: # Right
                         rotated_card = pygame.transform.rotate(CARD_IMAGES['card_back'], 90)
-                        pos = (current_width - card_height - 20 + highlight_offset,
-                              current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6)
+                        pos = (current_width - card_height - 20 + current_player_shift_x,
+                              current_height/2 - (len(player.hand) * card_width * 0.6)/2 + j * card_width * 0.6 + current_player_shift_y)
                         screen.blit(rotated_card, pos)
                         if is_current_player:
                             highlight_rect = pygame.Rect(pos[0] - 5, pos[1] - 5, card_height + 10, card_width + 10)
@@ -347,7 +378,7 @@ def main_game_ui(game):
         if winner:
             winner_text = f"{winner.name} wins!"
             winner_surface = winner_font.render(winner_text, True, (255, 255, 255))
-            winner_rect = winner_surface.get_rect(center=(current_width / 2, current_height * 0.25)) # Higher position
+            winner_rect = winner_surface.get_rect(center=(current_width / 2, current_height * 0.25))
             winner_bg_rect = winner_rect.copy().inflate(20, 10)
             winner_bg_surface = pygame.Surface(winner_bg_rect.size, pygame.SRCALPHA)
             winner_bg_surface.fill((0, 0, 0, 150))
@@ -362,7 +393,5 @@ def main_game_ui(game):
     pygame.quit()
     sys.exit()
 
-if __name__ == '__main__':
-    # Initialize a Game instance directly for immediate UI testing
-    # game_instance = Game() 
+if __name__ == 'main':
     main_game_ui()
