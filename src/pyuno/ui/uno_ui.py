@@ -461,6 +461,13 @@ def main_game_ui(game):
                         hovered_card_index = j 
                         break 
 
+                # Get playable cards for the human player
+                playable_cards = []
+                if is_current_player:
+                    top_card = game.deck.get_top_card()
+                    if top_card:
+                        playable_cards = player.get_playable_cards(top_card, game.selected_color)
+
                 for j, card in enumerate(player.hand):
                     card_draw_y = base_y_for_card_row
                     
@@ -482,7 +489,12 @@ def main_game_ui(game):
                             card_width + 10,
                             card_height + 10
                         )
-                        pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
+                        
+                        # Check if this card is playable and highlight with green if so
+                        if card in playable_cards:
+                            pygame.draw.rect(screen, (0, 255, 0), highlight_rect, 3, border_radius=5)  # Green for eligible cards
+                        else:
+                            pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)  # White for non-eligible
             else:  
                 current_player_shift_x = 0
                 current_player_shift_y = 0
