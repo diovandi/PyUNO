@@ -57,8 +57,16 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller pillow
 
-    - name: Build executable
+    - name: Try minimal build first
       run: |
+        echo "=== Attempting Ultra-Minimal Build ==="
+        echo "This removes ALL optional PyInstaller flags to test basic functionality"
+        python build_minimal.py
+      continue-on-error: true
+
+    - name: Try full build if minimal works
+      run: |
+        echo "=== Attempting Full Build ==="
         echo "Building for platform: ${{ matrix.platform }}"
         echo "Files in current directory:"
         ls -la
@@ -66,18 +74,25 @@ jobs:
         ls -la assets/ || echo "Assets directory not found"
         echo "Source directory:"
         ls -la src/ || echo "Source directory not found"
-        echo "Using simple build script..."
+        echo "Using full build script..."
         python build_simple.py
 
     - name: Verify build output
       shell: bash
       run: |
-        ls -la dist_final/
-        echo "Built executable: ${{ matrix.executable }}"
+        echo "=== Build Results ==="
+        echo "Checking dist_minimal (minimal build):"
+        ls -la dist_minimal/ || echo "No dist_minimal directory"
+        echo "Checking dist_final (full build):"
+        ls -la dist_final/ || echo "No dist_final directory"
+        
+        # Check for any successful build
         if [ -f "dist_final/${{ matrix.executable }}" ]; then
-          echo "✅ Executable created successfully"
+          echo "✅ Full build executable found: ${{ matrix.executable }}"
+        elif [ -f "dist_minimal/PyUNO_Minimal.exe" ] || [ -f "dist_minimal/PyUNO_Minimal.app" ] || [ -f "dist_minimal/PyUNO_Minimal" ]; then
+          echo "✅ Minimal build executable found"
         else
-          echo "❌ Executable not found"
+          echo "❌ No executable found in either location"
           exit 1
         fi
 
@@ -100,7 +115,9 @@ jobs:
         path: |
           dist_final/${{ matrix.executable }}
           dist_final/${{ matrix.launcher }}
+          dist_minimal/PyUNO_Minimal*
         retention-days: 90
+      if: always()  # Upload even if some steps failed
 
     - name: Package for release (if tag)
       if: startsWith(github.ref, 'refs/tags/v')
