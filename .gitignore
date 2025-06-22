@@ -1,3 +1,31 @@
 build/
 dist_final/
 dist_minimal/
+
+# Build artifacts and temporary files
+dist_*/
+build_*/
+*.spec
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing and diagnostic files
+test_*.py
+debug_*.py
+build_debug*.py
+build_ultra*.py
+build_minimal*.py
+build_simple*.py
+main_simple*.py
+cleanup_*.py
