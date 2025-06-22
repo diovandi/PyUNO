@@ -178,7 +178,7 @@ class Game:
             if card and card.color != "wild":
                 self.deck.play_card(card)
                 break
-            else:
+            elif card:
                 self.deck.cards.append(card)
 
         self.game_started = True
@@ -242,7 +242,7 @@ class Game:
         # Handle draw cards stacking
         if self.draw_stack_active:
             if card.value not in ["drawtwo", "drawfour"]:
-                # Stack is broken - apply penalties to next player
+                # Stack is broken - apply penalties to next player and skip their turn
                 next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
                 for _ in range(self.draw_cards_pending):
                     drawn_card = self.deck.draw_card()
@@ -250,6 +250,9 @@ class Game:
                         next_player.add_card(drawn_card)
                 self.draw_cards_pending = 0
                 self.draw_stack_active = False
+                # Skip the next player's turn by advancing twice
+                self.current_player_index = (self.current_player_index + self.direction * 2) % len(self.players)
+                self.is_ai_turn = self.current_player_index != 0
             elif card.value == "drawtwo" and top_card.value == "drawtwo":
                 self.draw_cards_pending += 2
             elif card.value == "drawfour" and top_card.value == "drawfour":
@@ -276,13 +279,15 @@ class Game:
         elif card.value == "skip":
             self.skip_next_turn = True
         elif card.value == "drawtwo":
-            # Apply draw two penalty to next player
+            # Apply draw two penalty to next player and skip their turn
             next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
             for _ in range(2):
                 drawn_card = self.deck.draw_card()
                 if drawn_card:
                     next_player.add_card(drawn_card)
-            self.next_player()
+            # Skip the next player's turn by advancing twice
+            self.current_player_index = (self.current_player_index + self.direction * 2) % len(self.players)
+            self.is_ai_turn = self.current_player_index != 0
             return True
         elif card.value == "drawfour":
             self.waiting_for_color = True
@@ -330,7 +335,9 @@ class Game:
                 drawn_card = self.deck.draw_card()
                 if drawn_card:
                     next_player.add_card(drawn_card)
-            self.next_player()
+            # Skip the next player's turn by advancing twice
+            self.current_player_index = (self.current_player_index + self.direction * 2) % len(self.players)
+            self.is_ai_turn = self.current_player_index != 0
         else:
             self.next_player()
         
@@ -356,7 +363,7 @@ class Game:
         if not self.game_started or player != self.get_current_player():
             return None
 
-        # If draw stack is active, player must draw the accumulated cards
+        # If draw stack is active, player must draw the accumulated cards and their turn is skipped
         if self.draw_stack_active:
             cards_drawn = 0
             for _ in range(self.draw_cards_pending):
@@ -366,6 +373,7 @@ class Game:
                     cards_drawn += 1
             self.draw_cards_pending = 0
             self.draw_stack_active = False
+            # Skip the current player's turn by advancing to the next player
             self.next_player()
             return None
 
