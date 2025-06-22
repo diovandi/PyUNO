@@ -201,6 +201,14 @@ def main_game_ui(game: Game):
             last_turn_time = current_time
             waiting_for_turn = True
 
+        # Check for UNO penalties
+        penalized_players = game.check_uno_penalties(current_time)
+        for player in penalized_players:
+            game.apply_uno_penalty(player)
+            if player == game.players[0]:  # Human player
+                draw_message = "Forgot to call UNO! Drew 2 cards."
+                draw_message_time = current_time
+
         # Clear draw message if it's expired
         if draw_message and current_time - draw_message_time >= draw_message_duration:
             draw_message = ""
@@ -226,54 +234,65 @@ def main_game_ui(game: Game):
                                     waiting_for_turn = True
                                 break
                     else:
-                        # Check if draw pile was clicked
-                        draw_pile_pos = (current_width / 2 + card_width * 0.2, current_height / 2 - card_height / 2)
-                        draw_pile_rect = pygame.Rect(draw_pile_pos[0], draw_pile_pos[1], card_width, card_height)
-                        if draw_pile_rect.collidepoint(mouse_pos):
+                        # Check if UNO button was clicked
+                        uno_button_rect = pygame.Rect(0, 0, 120, 50)
+                        uno_button_rect.center = (current_width / 2, current_height / 2 + card_height + 50)
+                        if uno_button_rect.collidepoint(mouse_pos):
                             current_player = game.get_current_player()
                             if current_player == game.players[0]:  # Human player
-                                drawn_card = game.draw_card(current_player)
-                                if drawn_card and drawn_card.can_play_on(game.deck.get_top_card(), game.selected_color):
-                                    # Auto-play the drawn card if it can be played
-                                    game.play_card(current_player, drawn_card)
-                                    if drawn_card.color == "wild":
-                                        # Auto-choose the most common color in hand
-                                        color_counts = {"red": 0, "yellow": 0, "green": 0, "blue": 0}
-                                        for card in current_player.hand:
-                                            if card.color != "wild":
-                                                color_counts[card.color] += 1
-                                        chosen_color = max(color_counts.items(), key=lambda x: x[1])[0]
-                                        game.select_color(chosen_color)
-                                if game.is_ai_turn:  # Only add delay if next player is AI
-                                    last_turn_time = current_time
-                                    waiting_for_turn = True
+                                if game.call_uno(current_player):
+                                    draw_message = "UNO called!"
+                                    draw_message_time = current_time
+                                else:
+                                    draw_message = "Invalid UNO call!"
+                                    draw_message_time = current_time
                         else:
-                            # Handle card selection for current player
-                            current_player = game.get_current_player()
-                            if current_player == game.players[0]:  # Human player
-                                # Check if a card was clicked
-                                for i, card in enumerate(current_player.hand):
-                                    card_rect = pygame.Rect(
-                                        current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
-                                        current_height - card_height - 20,
-                                        card_width,
-                                        card_height
-                                    )
-                                    if card_rect.collidepoint(mouse_pos):
-                                        if game.play_card(current_player, card):
-                                            # Handle draw cards
-                                            if card.value in ["drawtwo", "drawfour"]:
-                                                next_player = game.players[(game.current_player_index + game.direction) % len(game.players)]
-                                                if next_player == game.players[0]:  # If next player is human
-                                                    cards_to_draw = 2 if card.value == "drawtwo" else 4
-                                                    for _ in range(cards_to_draw):
-                                                        game.draw_card(next_player)
-                                                    draw_message = f"Drew {cards_to_draw} cards!"
-                                                    draw_message_time = current_time
-                                            if game.is_ai_turn:  # Only add delay if next player is AI
-                                                last_turn_time = current_time
-                                                waiting_for_turn = True
-                                            break
+                            # Check if draw pile was clicked
+                            draw_pile_pos = (current_width / 2 + card_width * 0.2, current_height / 2 - card_height / 2)
+                            draw_pile_rect = pygame.Rect(draw_pile_pos[0], draw_pile_pos[1], card_width, card_height)
+                            if draw_pile_rect.collidepoint(mouse_pos):
+                                current_player = game.get_current_player()
+                                if current_player == game.players[0]:  # Human player
+                                    # Only allow drawing if player has no playable cards or draw stack is active
+                                    if game.can_draw_card(current_player):
+                                        drawn_card = game.draw_card(current_player)
+                                        if drawn_card and drawn_card.can_play_on(game.deck.get_top_card(), game.selected_color):
+                                            # Auto-play the drawn card if it can be played
+                                            game.play_card(current_player, drawn_card)
+                                            if drawn_card.color == "wild":
+                                                # Auto-choose the most common color in hand
+                                                color_counts = {"red": 0, "yellow": 0, "green": 0, "blue": 0}
+                                                for card in current_player.hand:
+                                                    if card.color != "wild":
+                                                        color_counts[card.color] += 1
+                                                chosen_color = max(color_counts.items(), key=lambda x: x[1])[0]
+                                                game.select_color(chosen_color)
+                                        if game.is_ai_turn:  # Only add delay if next player is AI
+                                            last_turn_time = current_time
+                                            waiting_for_turn = True
+                                    else:
+                                        # Player has playable cards but tried to draw
+                                        draw_message = "You have playable cards!"
+                                        draw_message_time = current_time
+                            else:
+                                # Handle card selection for current player
+                                current_player = game.get_current_player()
+                                if current_player == game.players[0]:  # Human player
+                                    # Check if a card was clicked
+                                    for i, card in enumerate(current_player.hand):
+                                        card_rect = pygame.Rect(
+                                            current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
+                                            current_height - card_height - 20,
+                                            card_width,
+                                            card_height
+                                        )
+                                        if card_rect.collidepoint(mouse_pos):
+                                            if game.play_card(current_player, card):
+                                                # Handle draw cards - penalties are now handled in game logic
+                                                if game.is_ai_turn:  # Only add delay if next player is AI
+                                                    last_turn_time = current_time
+                                                    waiting_for_turn = True
+                                                break
 
         screen.fill(RED)
 
@@ -303,6 +322,16 @@ def main_game_ui(game: Game):
         # Draw Discard and Draw Piles
         discard_pile_pos = (current_width / 2 - card_width * 1.2, current_height / 2 - card_height / 2)
         draw_pile_pos = (current_width / 2 + card_width * 0.2, current_height / 2 - card_height / 2)
+        
+        # Check if draw pile should be clickable
+        current_player = game.get_current_player()
+        draw_pile_clickable = game.can_draw_card(current_player) and current_player == game.players[0]
+        
+        # Draw draw pile with visual feedback
+        if draw_pile_clickable:
+            # Highlight draw pile when clickable
+            highlight_rect = pygame.Rect(draw_pile_pos[0] - 5, draw_pile_pos[1] - 5, card_width + 10, card_height + 10)
+            pygame.draw.rect(screen, (255, 255, 0), highlight_rect, 2, border_radius=5)
         
         screen.blit(CARD_IMAGES['card_back'], draw_pile_pos)
         draw_text("DRAW", button_font, (255, 255, 255), screen, draw_pile_pos[0] + card_width/2, draw_pile_pos[1] + card_height + 20)
@@ -383,8 +412,24 @@ def main_game_ui(game: Game):
         uno_button_rect = pygame.Rect(0, 0, button_width, button_height)
         uno_button_rect.center = (button_center_x, button_center_y)
 
-        pygame.draw.rect(screen, (BLACK), uno_button_rect, border_radius=10)
+        # Check if current player has 1 card and hasn't called UNO
+        current_player = game.get_current_player()
+        needs_uno_call = current_player.has_one_card() and not current_player.has_called_uno
+        
+        # Change button color based on UNO status
+        if needs_uno_call and current_player == game.players[0]:  # Human player needs to call UNO
+            pygame.draw.rect(screen, (255, 255, 0), uno_button_rect, border_radius=10)  # Yellow for warning
+        else:
+            pygame.draw.rect(screen, (BLACK), uno_button_rect, border_radius=10)
+        
         draw_text("UNO!", button_font, (WHITE), screen, uno_button_rect.centerx, uno_button_rect.centery)
+        
+        # Show UNO warning message
+        if needs_uno_call and current_player == game.players[0]:
+            warning_text = "CALL UNO!"
+            warning_surface = status_font.render(warning_text, True, (255, 255, 0))
+            warning_rect = warning_surface.get_rect(center=(current_width / 2, current_height / 2 + card_height + 100))
+            screen.blit(warning_surface, warning_rect)
 
         # Draw color selection menu if waiting for color
         if game.waiting_for_color:

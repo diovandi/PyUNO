@@ -1,5 +1,6 @@
 import random
 from typing import List, Optional
+import time
 
 class Card:
     VALID_COLORS = ["red", "yellow", "green", "blue", "wild"]
@@ -92,14 +93,39 @@ class Player:
         self.name = name
         self.hand: List[Card] = []
         self.has_called_uno = False
+        self.uno_penalties = 0  # Track how many times player forgot to call UNO
 
     def add_card(self, card: Card):
         self.hand.append(card)
-        self.has_called_uno = False
+        # Reset UNO call when cards are added (if more than 1 card)
+        if len(self.hand) > 1:
+            self.has_called_uno = False
 
     def remove_card(self, card: Card):
         if card in self.hand:
             self.hand.remove(card)
+            # Check if player should call UNO after removing a card
+            if len(self.hand) == 1 and not self.has_called_uno:
+                # Player forgot to call UNO - will be penalized
+                pass
+
+    def call_uno(self) -> bool:
+        """Player calls UNO. Returns True if it's a valid call."""
+        if len(self.hand) == 1 and not self.has_called_uno:
+            self.has_called_uno = True
+            return True
+        return False
+
+    def check_uno_penalty(self) -> bool:
+        """Check if player should be penalized for not calling UNO."""
+        if len(self.hand) == 1 and not self.has_called_uno:
+            return True
+        return False
+
+    def apply_uno_penalty(self):
+        """Apply penalty for not calling UNO - draw 2 cards."""
+        self.uno_penalties += 1
+        self.has_called_uno = False
 
     def can_play_card(self, top_card: Card, selected_color: Optional[str] = None) -> bool:
         return any(card.can_play_on(top_card, selected_color) for card in self.hand)
@@ -127,6 +153,8 @@ class Game:
         self.skip_next_turn = False
         self.draw_cards_pending = 0
         self.draw_stack_active = False  # Track if draw stack is active
+        self.uno_call_window = 3.0  # Time window in seconds to call UNO after playing a card
+        self.last_card_played_time = 0  # Track when the last card was played
 
     def add_player(self, player: Player):
         self.players.append(player)
@@ -155,6 +183,35 @@ class Game:
 
         self.game_started = True
         self.is_ai_turn = self.current_player_index != 0  # True if first player is AI
+
+    def call_uno(self, player: Player) -> bool:
+        """Handle UNO call from a player. Returns True if valid call."""
+        if not self.game_started:
+            return False
+            
+        if player.call_uno():
+            return True
+        return False
+
+    def check_uno_penalties(self, current_time: float) -> List[Player]:
+        """Check for UNO penalties and return list of players who need to draw cards."""
+        penalized_players = []
+        
+        for player in self.players:
+            if player.check_uno_penalty():
+                # Check if enough time has passed since the last card was played
+                if current_time - self.last_card_played_time >= self.uno_call_window:
+                    penalized_players.append(player)
+        
+        return penalized_players
+
+    def apply_uno_penalty(self, player: Player):
+        """Apply UNO penalty to a player - draw 2 cards."""
+        player.apply_uno_penalty()
+        for _ in range(2):
+            drawn_card = self.deck.draw_card()
+            if drawn_card:
+                player.add_card(drawn_card)
 
     def next_player(self):
         if self.skip_next_turn:
@@ -209,12 +266,24 @@ class Game:
         self.deck.play_card(card)
         self.last_played_card = card
         self.selected_color = None
+        
+        # Record the time when card was played for UNO penalty checking
+        self.last_card_played_time = time.time()
 
         # Handle special cards
         if card.value == "reverse":
             self.reverse_direction()
         elif card.value == "skip":
             self.skip_next_turn = True
+        elif card.value == "drawtwo":
+            # Apply draw two penalty to next player
+            next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
+            for _ in range(2):
+                drawn_card = self.deck.draw_card()
+                if drawn_card:
+                    next_player.add_card(drawn_card)
+            self.next_player()
+            return True
         elif card.value == "drawfour":
             self.waiting_for_color = True
             return True  # Don't advance to next player until color is chosen
@@ -267,21 +336,40 @@ class Game:
         
         return True
 
+    def can_draw_card(self, player: Player) -> bool:
+        """Check if a player can draw a card (i.e., they have no playable cards)."""
+        if not self.game_started or player != self.get_current_player():
+            return False
+            
+        # If draw stack is active, player must draw
+        if self.draw_stack_active:
+            return True
+            
+        # Check if player has any playable cards
+        top_card = self.deck.get_top_card()
+        if not top_card:
+            return True
+            
+        return not player.can_play_card(top_card, self.selected_color)
+
     def draw_card(self, player: Player) -> Optional[Card]:
         if not self.game_started or player != self.get_current_player():
             return None
 
         # If draw stack is active, player must draw the accumulated cards
         if self.draw_stack_active:
+            cards_drawn = 0
             for _ in range(self.draw_cards_pending):
                 drawn_card = self.deck.draw_card()
                 if drawn_card:
                     player.add_card(drawn_card)
+                    cards_drawn += 1
             self.draw_cards_pending = 0
             self.draw_stack_active = False
             self.next_player()
             return None
 
+        # Normal draw - player draws one card
         card = self.deck.draw_card()
         if card:
             player.add_card(card)
@@ -309,6 +397,10 @@ class Game:
         
         if not top_card:
             return False
+
+        # AI calls UNO if they have 1 card and haven't called it yet
+        if current_player.has_one_card() and not current_player.has_called_uno:
+            self.call_uno(current_player)
 
         # Get playable cards
         playable_cards = current_player.get_playable_cards(top_card, self.selected_color)
