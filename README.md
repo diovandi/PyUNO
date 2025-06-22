@@ -1,5 +1,7 @@
 # PyUNO
 
+![PyUNO Logo](assets/uno_logo.png)
+
 A Python implementation of the classic UNO card game built with Pygame.
 
 ## Project Structure
@@ -34,15 +36,63 @@ PyUNO/
 
 ## Installation & Usage
 
+### Option 1: Run from Source
 1. Make sure you have Python 3.7+ installed
 2. Install required dependencies:
    ```bash
-   pip install pygame
+   pip install -r requirements.txt
    ```
 3. Run the game:
    ```bash
    python main_game.py
    ```
+
+### Option 2: Build Executable
+
+#### Windows
+1. Make sure you have Python 3.7+ installed
+2. Double-click `build.bat` or run:
+   ```cmd
+   python build_executable.py
+   ```
+3. Find `PyUNO.exe` in the `dist` folder
+4. Run `PyUNO.exe` directly or use `run_pyuno.bat`
+
+#### macOS
+1. Make sure you have Python 3.7+ installed
+2. Open Terminal and run:
+   ```bash
+   ./build.sh
+   ```
+   Or manually:
+   ```bash
+   python3 build_executable.py
+   ```
+3. Find `PyUNO.app` in the `dist` folder
+4. Double-click `PyUNO.app` or use `run_pyuno.command`
+
+#### Linux
+1. Make sure you have Python 3.7+ installed
+2. Open Terminal and run:
+   ```bash
+   ./build.sh
+   ```
+   Or manually:
+   ```bash
+   python3 build_executable.py
+   ```
+3. Find `PyUNO` executable in the `dist` folder
+4. Run `./PyUNO` directly or use `run_pyuno.sh`
+
+### Alternative Build Methods
+- Use the spec file: `pyinstaller pyuno.spec`
+- Clean build: `python build_executable.py --clean`
+- Rebuild: `python build_executable.py --rebuild`
+
+### Platform-Specific Notes
+- **macOS**: Supports both Intel and Apple Silicon Macs (Universal2 binary)
+- **Windows**: Creates a single `.exe` file with all dependencies
+- **Linux**: Creates a standalone executable compatible with most distributions
 
 ## Running Tests
 
