@@ -7,7 +7,7 @@ PyUNO uses custom fonts to create an enhanced visual experience. To ensure the g
 ## How It Works
 
 ### 1. Custom Fonts
-The game includes custom fonts in the `fonts/` directory:
+The game includes custom fonts in the `assets/` directory:
 - **Baksosapi.otf** - Used for credits
 - **Arcadeclassic.ttf** - Used for start button
 - **Fishcrispy.otf** - Used for titles and status text
@@ -57,28 +57,28 @@ Don't worry! The game will automatically use system fonts if custom fonts aren't
 
 ### Installing Custom Fonts (Optional)
 If you want the intended visual experience:
-1. All custom fonts are included in the `fonts/` directory
+1. All custom fonts are included in the `assets/` directory
 2. No additional installation required - they load directly from the game files
 
 ## Testing
 
-Run the font test script to verify everything works:
+The font system is tested as part of the main game tests:
 ```bash
-python test_fonts.py
+python -m pytest tests/test_uno_game.py -v
 ```
 
-This will test:
-- ✅ Custom font loading
-- ✅ Fallback font loading
-- ✅ Text rendering
+This will verify:
+- ✅ Font loading functionality
+- ✅ UI rendering with fonts
+- ✅ Graceful fallback handling
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"Font file not found" warnings**
-   - **Cause**: Missing font files in `fonts/` directory
-   - **Solution**: Ensure `fonts/` directory exists with all font files, or ignore (fallbacks will work)
+   - **Cause**: Missing font files in `assets/` directory
+   - **Solution**: Ensure `assets/` directory exists with all font files, or ignore (fallbacks will work)
 
 2. **Text appears in different font than expected**
    - **Cause**: Custom font failed to load, using fallback
@@ -86,7 +86,7 @@ This will test:
 
 3. **No text appears at all**
    - **Cause**: Severe font loading failure
-   - **Solution**: Run `test_fonts.py` to diagnose the issue
+   - **Solution**: Run the main game tests to diagnose font loading issues
 
 ### Advanced Configuration
 
@@ -110,9 +110,11 @@ You can modify font preferences in `font_config.py`:
 
 ## File Structure
 ```
-fonts/                  # Custom font files
-font_config.py         # Font configuration and mappings
-uno_ui.py             # Font loading implementation
-test_fonts.py         # Font system testing
-FONT_README.md        # This documentation
+assets/               # Custom font files and game assets
+src/pyuno/config/     # Font configuration
+├── font_config.py   # Font configuration and mappings
+src/pyuno/ui/         # UI implementation
+├── uno_ui.py        # Font loading implementation
+docs/                 # Documentation
+├── FONT_README.md   # This documentation
 ``` 

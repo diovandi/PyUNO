@@ -20,7 +20,7 @@ A Python implementation of the classic UNO card game built with Pygame.
 ```
 PyUNO/
 ├── dist_final/             # Built executable (ready to play!)
-│   ├── PyUNO_Final.exe    # Windows executable (78MB)
+│   ├── PyUNO_Final.exe    # Windows executable (75MB)
 │   └── run_pyuno_final.bat # Windows batch runner
 ├── src/                    # Source code
 │   └── pyuno/             # Main package
@@ -38,8 +38,7 @@ PyUNO/
 │       │   └── resource_path.py
 │       └── __init__.py
 ├── tests/                 # Test files
-│   ├── test_uno_game.py
-│   └── debug_test.py
+│   └── test_uno_game.py
 ├── docs/                  # Documentation
 │   ├── README_TESTS.md
 │   ├── FONT_README.md
@@ -176,9 +175,9 @@ To run the test suite:
 python -m pytest tests/
 ```
 
-To run debug tests:
+To run tests individually:
 ```bash
-python tests/debug_test.py
+python -m unittest tests.test_uno_game -v
 ```
 
 ## Features
