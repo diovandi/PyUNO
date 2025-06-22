@@ -1,0 +1,161 @@
+name: Build PyUNO Executables
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            executable: PyUNO_Final.exe
+            launcher: run_pyuno_final.bat
+          - os: macos-latest
+            platform: macos
+            executable: PyUNO_Final.app
+            launcher: run_pyuno_final.command
+          - os: ubuntu-latest
+            platform: linux
+            executable: PyUNO_Final
+            launcher: run_pyuno_final.sh
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+        sudo apt-get install -y libfreetype6-dev libportmidi-dev libjpeg-dev python3-dev
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller pillow
+
+    - name: Build executable
+      run: python build_final.py
+
+    - name: Verify build output
+      shell: bash
+      run: |
+        ls -la dist_final/
+        echo "Built executable: ${{ matrix.executable }}"
+        if [ -f "dist_final/${{ matrix.executable }}" ]; then
+          echo "✅ Executable created successfully"
+        else
+          echo "❌ Executable not found"
+          exit 1
+        fi
+
+    - name: Create artifact name
+      id: artifact
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" =~ refs/tags/v.* ]]; then
+          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\///')
+          echo "name=PyUNO_${VERSION}_${{ matrix.platform }}" >> $GITHUB_OUTPUT
+        else
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+          echo "name=PyUNO_${SHORT_SHA}_${{ matrix.platform }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: |
+          dist_final/${{ matrix.executable }}
+          dist_final/${{ matrix.launcher }}
+        retention-days: 90
+
+    - name: Package for release (if tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      shell: bash
+      run: |
+        cd dist_final
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          # Create ZIP for Windows
+          7z a "../PyUNO_${{ github.ref_name }}_Windows.zip" PyUNO_Final.exe run_pyuno_final.bat
+        elif [ "${{ matrix.platform }}" = "macos" ]; then
+          # Create ZIP for macOS
+          zip -r "../PyUNO_${{ github.ref_name }}_macOS.zip" PyUNO_Final.app run_pyuno_final.command
+        else
+          # Create tar.gz for Linux
+          tar -czf "../PyUNO_${{ github.ref_name }}_Linux.tar.gz" PyUNO_Final run_pyuno_final.sh
+        fi
+
+    - name: Upload release asset
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-packages
+        path: |
+          PyUNO_${{ github.ref_name }}_*.zip
+          PyUNO_${{ github.ref_name }}_*.tar.gz
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download release packages
+      uses: actions/download-artifact@v3
+      with:
+        name: release-packages
+        path: ./release-files
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: PyUNO ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          ./release-files/PyUNO_${{ github.ref_name }}_Windows.zip
+          ./release-files/PyUNO_${{ github.ref_name }}_macOS.zip
+          ./release-files/PyUNO_${{ github.ref_name }}_Linux.tar.gz
+        body: |
+          🎮 **PyUNO ${{ github.ref_name }}** - Cross-Platform Release
+
+          ## Downloads
+          - **Windows**: `PyUNO_${{ github.ref_name }}_Windows.zip` (includes .exe and .bat launcher)
+          - **macOS**: `PyUNO_${{ github.ref_name }}_macOS.zip` (includes .app bundle and .command launcher)
+          - **Linux**: `PyUNO_${{ github.ref_name }}_Linux.tar.gz` (includes executable and .sh launcher)
+
+          ## Platform Features
+          - **Windows**: ICO icons, works from Explorer and Terminal
+          - **macOS**: ICNS icons, Universal2 binary (Intel + Apple Silicon)
+          - **Linux**: PNG icons, executable permissions set
+
+          ## How to Run
+          - **Windows**: Extract and double-click `PyUNO_Final.exe` or `run_pyuno_final.bat`
+          - **macOS**: Extract and double-click `PyUNO_Final.app` or `run_pyuno_final.command`
+          - **Linux**: Extract and run `./PyUNO_Final` or `./run_pyuno_final.sh`
+
+          Ready to play! No installation required. 🚀
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
