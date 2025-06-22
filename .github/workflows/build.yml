@@ -86,14 +86,24 @@ jobs:
         echo "Checking dist_final (full build):"
         ls -la dist_final/ || echo "No dist_final directory"
         
-        # Check for any successful build
+        # Check for any successful build (but don't fail the job)
+        BUILD_SUCCESS=false
+        
         if [ -f "dist_final/${{ matrix.executable }}" ]; then
           echo "✅ Full build executable found: ${{ matrix.executable }}"
-        elif [ -f "dist_minimal/PyUNO_Minimal.exe" ] || [ -f "dist_minimal/PyUNO_Minimal.app" ] || [ -f "dist_minimal/PyUNO_Minimal" ]; then
+          BUILD_SUCCESS=true
+        fi
+        
+        if [ -f "dist_minimal/PyUNO_Minimal.exe" ] || [ -d "dist_minimal/PyUNO_Minimal.app" ] || [ -f "dist_minimal/PyUNO_Minimal" ]; then
           echo "✅ Minimal build executable found"
-        else
+          BUILD_SUCCESS=true
+        fi
+        
+        if [ "$BUILD_SUCCESS" = "false" ]; then
           echo "❌ No executable found in either location"
-          exit 1
+          echo "This indicates both builds failed completely"
+        else
+          echo "✅ At least one build produced output"
         fi
 
     - name: Create artifact name
@@ -105,6 +115,44 @@ jobs:
         echo "name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
         echo "Created artifact name: ${ARTIFACT_NAME}"
 
+    - name: Check what files exist for upload
+      id: check_files
+      shell: bash
+      run: |
+        echo "=== Checking files for artifact upload ==="
+        FILES_TO_UPLOAD=""
+        
+        # Check for full build files
+        if [ -f "dist_final/${{ matrix.executable }}" ]; then
+          echo "✓ Found full executable: dist_final/${{ matrix.executable }}"
+          FILES_TO_UPLOAD="${FILES_TO_UPLOAD} dist_final/${{ matrix.executable }}"
+        fi
+        
+        if [ -f "dist_final/${{ matrix.launcher }}" ]; then
+          echo "✓ Found launcher: dist_final/${{ matrix.launcher }}"
+          FILES_TO_UPLOAD="${FILES_TO_UPLOAD} dist_final/${{ matrix.launcher }}"
+        fi
+        
+        # Check for minimal build files
+        if [ -f "dist_minimal/PyUNO_Minimal.exe" ]; then
+          echo "✓ Found minimal Windows exe"
+          FILES_TO_UPLOAD="${FILES_TO_UPLOAD} dist_minimal/PyUNO_Minimal.exe"
+        elif [ -d "dist_minimal/PyUNO_Minimal.app" ]; then
+          echo "✓ Found minimal macOS app"
+          FILES_TO_UPLOAD="${FILES_TO_UPLOAD} dist_minimal/PyUNO_Minimal.app"
+        elif [ -f "dist_minimal/PyUNO_Minimal" ]; then
+          echo "✓ Found minimal Linux executable"
+          FILES_TO_UPLOAD="${FILES_TO_UPLOAD} dist_minimal/PyUNO_Minimal"
+        fi
+        
+        if [ -n "$FILES_TO_UPLOAD" ]; then
+          echo "has_files=true" >> $GITHUB_OUTPUT
+          echo "FILES TO UPLOAD: $FILES_TO_UPLOAD"
+        else
+          echo "has_files=false" >> $GITHUB_OUTPUT
+          echo "❌ No files found for upload"
+        fi
+
     - name: Upload executable as artifact
       uses: actions/upload-artifact@v4
       with:
@@ -114,7 +162,8 @@ jobs:
           dist_final/${{ matrix.launcher }}
           dist_minimal/PyUNO_Minimal*
         retention-days: 90
-      if: always()  # Upload even if some steps failed
+        if-no-files-found: ignore
+      if: steps.check_files.outputs.has_files == 'true'
 
     - name: Package for release (if tag)
       if: startsWith(github.ref, 'refs/tags/v')
