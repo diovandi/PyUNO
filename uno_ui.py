@@ -226,32 +226,54 @@ def main_game_ui(game: Game):
                                     waiting_for_turn = True
                                 break
                     else:
-                        # Handle card selection for current player
-                        current_player = game.get_current_player()
-                        if current_player == game.players[0]:  # Human player
-                            # Check if a card was clicked
-                            for i, card in enumerate(current_player.hand):
-                                card_rect = pygame.Rect(
-                                    current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
-                                    current_height - card_height - 20,
-                                    card_width,
-                                    card_height
-                                )
-                                if card_rect.collidepoint(mouse_pos):
-                                    if game.play_card(current_player, card):
-                                        # Handle draw cards
-                                        if card.value in ["drawtwo", "drawfour"]:
-                                            next_player = game.players[(game.current_player_index + game.direction) % len(game.players)]
-                                            if next_player == game.players[0]:  # If next player is human
-                                                cards_to_draw = 2 if card.value == "drawtwo" else 4
-                                                for _ in range(cards_to_draw):
-                                                    game.draw_card(next_player)
-                                                draw_message = f"Drew {cards_to_draw} cards!"
-                                                draw_message_time = current_time
-                                        if game.is_ai_turn:  # Only add delay if next player is AI
-                                            last_turn_time = current_time
-                                            waiting_for_turn = True
-                                        break
+                        # Check if draw pile was clicked
+                        draw_pile_pos = (current_width / 2 + card_width * 0.2, current_height / 2 - card_height / 2)
+                        draw_pile_rect = pygame.Rect(draw_pile_pos[0], draw_pile_pos[1], card_width, card_height)
+                        if draw_pile_rect.collidepoint(mouse_pos):
+                            current_player = game.get_current_player()
+                            if current_player == game.players[0]:  # Human player
+                                drawn_card = game.draw_card(current_player)
+                                if drawn_card and drawn_card.can_play_on(game.deck.get_top_card(), game.selected_color):
+                                    # Auto-play the drawn card if it can be played
+                                    game.play_card(current_player, drawn_card)
+                                    if drawn_card.color == "wild":
+                                        # Auto-choose the most common color in hand
+                                        color_counts = {"red": 0, "yellow": 0, "green": 0, "blue": 0}
+                                        for card in current_player.hand:
+                                            if card.color != "wild":
+                                                color_counts[card.color] += 1
+                                        chosen_color = max(color_counts.items(), key=lambda x: x[1])[0]
+                                        game.select_color(chosen_color)
+                                if game.is_ai_turn:  # Only add delay if next player is AI
+                                    last_turn_time = current_time
+                                    waiting_for_turn = True
+                        else:
+                            # Handle card selection for current player
+                            current_player = game.get_current_player()
+                            if current_player == game.players[0]:  # Human player
+                                # Check if a card was clicked
+                                for i, card in enumerate(current_player.hand):
+                                    card_rect = pygame.Rect(
+                                        current_width/2 - (len(current_player.hand) * card_width * 0.6)/2 + i * card_width * 0.6,
+                                        current_height - card_height - 20,
+                                        card_width,
+                                        card_height
+                                    )
+                                    if card_rect.collidepoint(mouse_pos):
+                                        if game.play_card(current_player, card):
+                                            # Handle draw cards
+                                            if card.value in ["drawtwo", "drawfour"]:
+                                                next_player = game.players[(game.current_player_index + game.direction) % len(game.players)]
+                                                if next_player == game.players[0]:  # If next player is human
+                                                    cards_to_draw = 2 if card.value == "drawtwo" else 4
+                                                    for _ in range(cards_to_draw):
+                                                        game.draw_card(next_player)
+                                                    draw_message = f"Drew {cards_to_draw} cards!"
+                                                    draw_message_time = current_time
+                                            if game.is_ai_turn:  # Only add delay if next player is AI
+                                                last_turn_time = current_time
+                                                waiting_for_turn = True
+                                            break
 
         screen.fill(RED)
 
