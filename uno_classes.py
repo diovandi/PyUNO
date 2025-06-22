@@ -28,22 +28,24 @@ class Card:
     def __str__(self) -> str:
         return self.name
 
+    def __eq__(self, other):
+        if not isinstance(other, Card):
+            return False
+        return self.color == other.color and self.value == other.value
+
+    def __hash__(self):
+        return hash((self.color, self.value))
+
     def can_play_on(self, other_card: 'Card', selected_color: Optional[str] = None) -> bool:
-        # If this is a wild card, it can always be played
+        # Wild cards can always be played
         if self.color == "wild":
             return True
-            
-        # If the other card is a wild card and has a selected color
+        # If the other card is a wild and a color is selected, match color
         if other_card.color == "wild" and selected_color:
-            # Can play if this card matches the selected color
             return self.color == selected_color
-            
-        # Special case for draw cards: can stack draw cards
-        if self.value in ["drawtwo", "drawfour"] and other_card.value in ["drawtwo", "drawfour"]:
-            return True
-            
-        # Normal case: match color or value
-        return self.color == other_card.color or self.value == other_card.value
+        # If this card is not wild, match color or value
+        result = self.color == other_card.color or self.value == other_card.value
+        return result
 
 class Deck:
     def __init__(self):
@@ -78,9 +80,11 @@ class Deck:
     def _reshuffle_discard_pile(self):
         if len(self.discard_pile) > 1:
             top_card = self.discard_pile.pop()
-            self.cards = self.discard_pile
+            self.cards = self.discard_pile.copy()
             self.discard_pile = [top_card]
             self.shuffle()
+        # If only one card in discard pile, we can't reshuffle
+        # This should rarely happen as cards are constantly being played
 
     def play_card(self, card: Card):
         self.discard_pile.append(card)
@@ -200,7 +204,8 @@ class Game:
         for player in self.players:
             if player.check_uno_penalty():
                 # Check if enough time has passed since the last card was played
-                if current_time - self.last_card_played_time >= self.uno_call_window:
+                # If last_card_played_time is 0, it means no card has been played yet
+                if self.last_card_played_time == 0 or current_time - self.last_card_played_time >= self.uno_call_window:
                     penalized_players.append(player)
         
         return penalized_players
@@ -242,17 +247,16 @@ class Game:
         # Handle draw cards stacking
         if self.draw_stack_active:
             if card.value not in ["drawtwo", "drawfour"]:
-                # Stack is broken - apply penalties to next player and skip their turn
-                next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
+                # Stack is broken - apply penalties to current player who is breaking the stack
                 for _ in range(self.draw_cards_pending):
                     drawn_card = self.deck.draw_card()
                     if drawn_card:
-                        next_player.add_card(drawn_card)
+                        player.add_card(drawn_card)
                 self.draw_cards_pending = 0
                 self.draw_stack_active = False
-                # Skip the next player's turn by advancing twice
-                self.current_player_index = (self.current_player_index + self.direction * 2) % len(self.players)
-                self.is_ai_turn = self.current_player_index != 0
+                
+                # Handle the played card normally and continue to normal flow
+                # (no early return, let the normal card playing logic handle the rest)
             elif card.value == "drawtwo" and top_card.value == "drawtwo":
                 self.draw_cards_pending += 2
             elif card.value == "drawfour" and top_card.value == "drawfour":
@@ -276,20 +280,19 @@ class Game:
         # Handle special cards
         if card.value == "reverse":
             self.reverse_direction()
+            # In 2-player games, reverse_direction() sets skip_next_turn = True
+            # which will be handled by the normal next_player() call at the end
         elif card.value == "skip":
             self.skip_next_turn = True
+            self.next_player()
+            return True
         elif card.value == "drawtwo":
-            # Apply draw two penalty to next player and skip their turn
-            next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
-            for _ in range(2):
-                drawn_card = self.deck.draw_card()
-                if drawn_card:
-                    next_player.add_card(drawn_card)
-            # Skip the next player's turn by advancing twice
-            self.current_player_index = (self.current_player_index + self.direction * 2) % len(self.players)
-            self.is_ai_turn = self.current_player_index != 0
+            # Draw Two cards use the stacking system - penalties applied when stack is broken or turn ends
+            # The draw stack is already activated above, just advance to next player
+            self.next_player()
             return True
         elif card.value == "drawfour":
+            # Draw Four penalty is handled in select_color()
             self.waiting_for_color = True
             return True  # Don't advance to next player until color is chosen
 
@@ -298,6 +301,12 @@ class Game:
             self.waiting_for_color = True
             return True  # Don't advance to next player until color is chosen
 
+        # Check if human player now has 1 card and needs to call UNO
+        if player == self.players[0] and player.has_one_card() and not player.has_called_uno:
+            # Don't advance turn yet - let the QTE system handle the UNO call
+            return True
+
+        # For normal cards, advance to next player
         self.next_player()
         return True
 
@@ -315,21 +324,8 @@ class Game:
         # Get the current wild card
         current_wild = self.deck.discard_pile[-1]
         
-        # Create a new wild card with the same value but updated color
+        # Handle draw four penalty BEFORE changing the card
         if current_wild.value == "drawfour":
-            new_card = Card("wild", "drawfour")
-        else:
-            new_card = Card("wild", "standard")
-        
-        # Replace the wild card in the discard pile
-        self.deck.discard_pile[-1] = new_card
-        
-        # Reset the waiting state
-        self.waiting_for_color = False
-        self.last_played_card = None
-        
-        # Handle draw four penalty
-        if new_card.value == "drawfour":
             next_player = self.players[(self.current_player_index + self.direction) % len(self.players)]
             for _ in range(4):
                 drawn_card = self.deck.draw_card()
@@ -340,6 +336,18 @@ class Game:
             self.is_ai_turn = self.current_player_index != 0
         else:
             self.next_player()
+        
+        # Create a new normal card with the selected color (not a wild card anymore)
+        # This represents the "resolved" wild card with its chosen color
+        # Use a neutral numbered card that any card can be played on
+        new_card = Card(color, "0")
+        
+        # Replace the wild card in the discard pile
+        self.deck.discard_pile[-1] = new_card
+        
+        # Reset the waiting state
+        self.waiting_for_color = False
+        self.last_played_card = None
         
         return True
 

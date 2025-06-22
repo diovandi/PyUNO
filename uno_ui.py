@@ -12,6 +12,7 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
 pygame.display.set_caption("PyUNO by Group 19")
 
 uno_logo_original = pygame.image.load('uno_logo.png').convert_alpha()
+pygame.display.set_icon(uno_logo_original)
 
 GREEN = (0, 100, 0)
 WHITE = (255, 255, 255)
@@ -154,6 +155,12 @@ def main_game_ui(game):
     draw_message = ""
     draw_message_time = 0
     draw_message_duration = 2.0
+    
+    # UNO QTE variables
+    uno_qte_active = False
+    uno_qte_start_time = 0
+    uno_qte_duration = 3.0  # 3 seconds to call UNO
+    uno_qte_button_rect = None
 
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
@@ -182,13 +189,30 @@ def main_game_ui(game):
             last_turn_time = current_time
             waiting_for_turn = True
 
-        # Check for UNO penalties
-        penalized_players = game.check_uno_penalties(current_time)
-        for player in penalized_players:
-            game.apply_uno_penalty(player)
-            if player == game.players[0]:  # Human player
-                draw_message = "Forgot to call UNO! Drew 2 cards."
-                draw_message_time = current_time
+        # UNO QTE Logic
+        current_player = game.get_current_player()
+        if current_player == game.players[0]:  # Human player
+            if current_player.has_one_card() and not current_player.has_called_uno:
+                if not uno_qte_active:
+                    # Start UNO QTE
+                    uno_qte_active = True
+                    uno_qte_start_time = current_time
+                else:
+                    # Check if QTE time expired
+                    if current_time - uno_qte_start_time >= uno_qte_duration:
+                        # QTE failed - apply penalty
+                        game.apply_uno_penalty(current_player)
+                        draw_message = "UNO QTE Failed! Drew 2 cards."
+                        draw_message_time = current_time
+                        uno_qte_active = False
+                        # Now advance the turn since the QTE is complete
+                        game.next_player()
+            else:
+                # Player doesn't need to call UNO anymore
+                uno_qte_active = False
+        else:
+            # Not human player's turn
+            uno_qte_active = False
 
         if draw_message and current_time - draw_message_time >= draw_message_duration:
             draw_message = ""
@@ -222,24 +246,45 @@ def main_game_ui(game):
                     else:
                         current_player = game.get_current_player()
                         if current_player == game.players[0]:
-                            # Check if draw pile was clicked
+                            # Define draw pile position and rect for click detection
                             draw_pile_pos = (current_width / 2 + card_width * 0.2, current_height / 2 - card_height / 2)
                             draw_pile_rect = pygame.Rect(draw_pile_pos[0], draw_pile_pos[1], card_width, card_height)
-                            if draw_pile_rect.collidepoint(mouse_pos):
+                            
+                            # Check UNO button first (highest priority)
+                            if uno_button_rect.collidepoint(mouse_pos):
+                                if uno_qte_active:
+                                    # QTE successful - call UNO
+                                    if game.call_uno(current_player):
+                                        draw_message = "UNO called! QTE Success!"
+                                        draw_message_time = current_time
+                                        uno_qte_active = False
+                                        # Advance the turn since UNO was called successfully
+                                        game.next_player()
+                                    else:
+                                        draw_message = "Invalid UNO call!"
+                                        draw_message_time = current_time
+                                else:
+                                    draw_message = "No UNO QTE active!"
+                                    draw_message_time = current_time
+                            # Check if draw pile was clicked
+                            elif draw_pile_rect.collidepoint(mouse_pos):
                                 # Only allow drawing if player has no playable cards or draw stack is active
                                 if game.can_draw_card(current_player):
                                     drawn_card = game.draw_card(current_player)
                                     if drawn_card and drawn_card.can_play_on(game.deck.get_top_card(), game.selected_color):
-                                        # Auto-play the drawn card if it can be played
-                                        game.play_card(current_player, drawn_card)
-                                        if drawn_card.color == "wild":
-                                            # Auto-choose the most common color in hand
-                                            color_counts = {"red": 0, "yellow": 0, "green": 0, "blue": 0}
-                                            for card in current_player.hand:
-                                                if card.color != "wild":
-                                                    color_counts[card.color] += 1
-                                            chosen_color = max(color_counts.items(), key=lambda x: x[1])[0]
-                                            game.select_color(chosen_color)
+                                        # Only auto-play if it won't result in 1 card (to let QTE handle UNO calls)
+                                        if len(current_player.hand) > 1:
+                                            # Auto-play the drawn card if it can be played
+                                            game.play_card(current_player, drawn_card)
+                                            if drawn_card.color == "wild":
+                                                # Auto-choose the most common color in hand
+                                                color_counts = {"red": 0, "yellow": 0, "green": 0, "blue": 0}
+                                                for card in current_player.hand:
+                                                    if card.color != "wild":
+                                                        color_counts[card.color] += 1
+                                                chosen_color = max(color_counts.items(), key=lambda x: x[1])[0]
+                                                game.select_color(chosen_color)
+                                        # If player would have 1 card after playing, don't auto-play - let QTE handle it
                                     if game.is_ai_turn:  # Only add delay if next player is AI
                                         last_turn_time = current_time
                                         waiting_for_turn = True
@@ -266,24 +311,10 @@ def main_game_ui(game):
                                 if hovered_card_to_play_index != -1:
                                     card_to_play = current_player.hand[hovered_card_to_play_index]
                                     if game.play_card(current_player, card_to_play):
-                                        # Check if player now has 1 card and needs to call UNO
-                                        if current_player.has_one_card() and not current_player.has_called_uno:
-                                            # Automatically call UNO for the player
-                                            if game.call_uno(current_player):
-                                                draw_message = "UNO called!"
-                                                draw_message_time = current_time
+                                        # Don't automatically call UNO - let the QTE system handle it
                                         if game.is_ai_turn:  # Only add delay if next player is AI
                                             last_turn_time = current_time
                                             waiting_for_turn = True
-                        if uno_button_rect.collidepoint(mouse_pos):
-                            current_player = game.get_current_player()
-                            if current_player == game.players[0]:  # Human player
-                                if game.call_uno(current_player):
-                                    draw_message = "UNO called!"
-                                    draw_message_time = current_time
-                                else:
-                                    draw_message = "Invalid UNO call!"
-                                    draw_message_time = current_time
 
         screen.fill(RED)
 
@@ -417,23 +448,6 @@ def main_game_ui(game):
                             highlight_rect = pygame.Rect(pos[0] - 5, pos[1] - 5, card_height + 10, card_width + 10)
                             pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
 
-        # Check if current player has 1 card and hasn't called UNO
-        needs_uno_call = current_player.has_one_card() and not current_player.has_called_uno
-        
-        # Only show UNO button when player needs to call UNO
-        if needs_uno_call and current_player == game.players[0]:  # Human player needs to call UNO
-            pygame.draw.rect(screen, (255, 255, 0), uno_button_rect, border_radius=10)  # Yellow for warning
-            draw_text("UNO!", uno_button_font, WHITE, screen, uno_button_rect.centerx, uno_button_rect.centery)
-            
-            # Show UNO warning message
-            warning_text = "CALL UNO!"
-            warning_surface = status_font.render(warning_text, True, (255, 255, 0))
-            warning_rect = warning_surface.get_rect(center=(current_width / 2, current_height / 2 + card_height + 100))
-            screen.blit(warning_surface, warning_rect)
-
-        if game.waiting_for_color:
-            draw_color_selection_menu(screen, current_width, current_height, button_font)
-
         winner = game.check_winner()
         if winner:
             winner_text = f"{winner.name} wins!"
@@ -447,6 +461,49 @@ def main_game_ui(game):
             pygame.display.flip()
             pygame.time.wait(5000)
             running = False
+
+        # UNO QTE Visual Elements
+        if uno_qte_active:
+            # Draw UNO button with timer
+            remaining_time = max(0, uno_qte_duration - (current_time - uno_qte_start_time))
+            time_percentage = remaining_time / uno_qte_duration
+            
+            # Button color changes based on remaining time
+            if time_percentage > 0.6:
+                button_color = (0, 255, 0)  # Green - plenty of time
+            elif time_percentage > 0.3:
+                button_color = (255, 255, 0)  # Yellow - warning
+            else:
+                button_color = (255, 0, 0)  # Red - almost out of time
+            
+            # Draw button with color
+            pygame.draw.rect(screen, button_color, uno_button_rect, border_radius=10)
+            pygame.draw.rect(screen, WHITE, uno_button_rect, 3, border_radius=10)  # White border
+            
+            # Draw UNO text
+            draw_text("UNO!", uno_button_font, WHITE, screen, uno_button_rect.centerx, uno_button_rect.centery)
+            
+            # Draw timer bar
+            timer_bar_width = int(uno_button_width * 0.8)
+            timer_bar_height = 8
+            timer_bar_x = uno_button_rect.centerx - timer_bar_width // 2
+            timer_bar_y = uno_button_rect.bottom + 10
+            
+            # Background bar
+            pygame.draw.rect(screen, (100, 100, 100), (timer_bar_x, timer_bar_y, timer_bar_width, timer_bar_height), border_radius=4)
+            # Progress bar
+            progress_width = int(timer_bar_width * time_percentage)
+            if progress_width > 0:
+                pygame.draw.rect(screen, button_color, (timer_bar_x, timer_bar_y, progress_width, timer_bar_height), border_radius=4)
+            
+            # Draw warning message
+            warning_text = f"CALL UNO! {remaining_time:.1f}s"
+            warning_surface = status_font.render(warning_text, True, button_color)
+            warning_rect = warning_surface.get_rect(center=(current_width / 2, current_height / 2 + card_height + 100))
+            screen.blit(warning_surface, warning_rect)
+
+        if game.waiting_for_color:
+            draw_color_selection_menu(screen, current_width, current_height, button_font)
 
         pygame.display.flip()
         
