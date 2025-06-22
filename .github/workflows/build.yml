@@ -64,12 +64,12 @@ jobs:
         python build_minimal.py
       continue-on-error: true
 
-    - name: Windows-specific debug (if Windows)
+    - name: Windows ultra-basic debug (if Windows)
       if: matrix.platform == 'windows'
       run: |
-        echo "=== Windows-Specific Debugging ==="
-        echo "Running comprehensive Windows CI diagnostic"
-        python build_debug_windows.py
+        echo "=== Windows Ultra-Basic Debugging ==="
+        echo "Testing each component separately to isolate failure point"
+        python build_ultra_basic.py
       continue-on-error: true
 
     - name: Try full build if minimal works

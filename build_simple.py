@@ -58,45 +58,59 @@ def main():
     # Simple build command (like the local one that worked)
     print("\n--- Build Configuration ---")
     separator = ";" if platform.system() == "Windows" else ":"
+    
+    # Detect if we're in CI environment
+    is_ci = os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true'
+    
     cmd = [
         "pyinstaller",
         "--onefile",
         "--name", "PyUNO_Final",
-        "--add-data", f"assets{separator}assets",
-        "--collect-all", "pygame",
         "--distpath", "dist_final",
         "--noconfirm",
         "main_game.py"
     ]
     
-    # Only add --windowed on non-Windows for now to debug Windows issues
-    if platform.system() != "Windows":
-        cmd.insert(2, "--windowed")  # Insert after --onefile
-        print("Added --windowed flag for non-Windows platform")
+    # Add platform-specific and CI-specific flags
+    if platform.system() == "Windows":
+        if is_ci:
+            print("🔧 Windows CI detected - using simplified build")
+            # Skip complex flags that might fail in CI
+            print("  - Skipping --add-data (assets will be missing but executable should build)")
+            print("  - Skipping --collect-all pygame (let PyInstaller auto-detect)")
+            print("  - Skipping --windowed (console mode for easier debugging)")
+        else:
+            print("🏠 Windows local build - using full features")
+            cmd.extend([
+                "--add-data", f"assets{separator}assets",
+                "--collect-all", "pygame",
+            ])
     else:
-        print("Skipping --windowed on Windows for debugging")
+        print(f"🐧 Non-Windows platform ({platform.system()}) - using standard build")
+        cmd.insert(2, "--windowed")  # Insert after --onefile
+        cmd.extend([
+            "--add-data", f"assets{separator}assets", 
+            "--collect-all", "pygame",
+        ])
     
-    # Simplified icon handling - only use existing files, don't generate
+    # Simplified icon handling - only for non-CI Windows or other platforms
     icon_file = None
-    if platform.system() == "Windows" and os.path.exists("assets/uno_logo.ico"):
-        icon_file = "assets/uno_logo.ico"
-        print(f"✓ Found existing ICO file: {icon_file}")
-    elif platform.system() == "Darwin" and os.path.exists("assets/uno_logo.png"):
-        icon_file = "assets/uno_logo.png"
-        print(f"✓ Using PNG for macOS: {icon_file}")
-    elif os.path.exists("assets/uno_logo.png"):
-        # Only use PNG on non-Windows if no ICO exists
-        if platform.system() != "Windows":
+    if not (platform.system() == "Windows" and is_ci):
+        if platform.system() == "Windows" and os.path.exists("assets/uno_logo.ico"):
+            icon_file = "assets/uno_logo.ico"
+            print(f"✓ Found existing ICO file: {icon_file}")
+        elif os.path.exists("assets/uno_logo.png"):
             icon_file = "assets/uno_logo.png"
             print(f"✓ Using PNG icon: {icon_file}")
-        else:
-            print("⚠️  PNG found but skipping on Windows (no ICO available)")
-    
-    if icon_file:
-        cmd.extend(["--icon", icon_file])
-        print(f"✓ Using icon: {icon_file}")
+            
+        if icon_file:
+            cmd.extend(["--icon", icon_file])
+            print(f"✓ Using icon: {icon_file}")
     else:
-        print("⚠️  No icon file used (may help with Windows debugging)")
+        print("⚠️  Skipping icon for Windows CI (may resolve build issues)")
+    
+    if not icon_file:
+        print("⚠️  No icon file used")
     
     print(f"Command: {' '.join(cmd)}")
     print(f"Data separator: '{separator}' for {platform.system()}")
