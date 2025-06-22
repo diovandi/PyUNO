@@ -4,8 +4,15 @@ Comprehensive debug tests for all identified UNO game issues.
 Tests the recent fixes for draw card logic, deck reshuffling, and special card handling.
 """
 
-from uno_classes import Game, Player, Card
+import sys
+import os
 import time
+
+# Add the src directory to Python path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_path = os.path.join(project_root, 'src')
+sys.path.insert(0, src_path)
+from pyuno.core.uno_classes import Game, Player, Card
 
 def test_draw_two_consistency():
     """Test that Draw Two cards work consistently."""

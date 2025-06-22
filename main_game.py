@@ -1,7 +1,7 @@
 import pygame
 import sys
-from uno_classes import Game, Player, Card
-from uno_ui import start_menu, main_game_ui
+from src.pyuno.core.uno_classes import Game, Player, Card
+from src.pyuno.ui.uno_ui import start_menu, main_game_ui
 
 def initialize_game():
     # Create game instance

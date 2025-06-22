@@ -1,7 +1,14 @@
 import unittest
 import time
+import sys
+import os
 from unittest.mock import patch, MagicMock
-from uno_classes import Card, Deck, Player, Game
+
+# Add the src directory to Python path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_path = os.path.join(project_root, 'src')
+sys.path.insert(0, src_path)
+from pyuno.core.uno_classes import Card, Deck, Player, Game
 
 
 class TestCard(unittest.TestCase):
