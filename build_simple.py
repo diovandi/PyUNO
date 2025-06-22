@@ -61,7 +61,6 @@ def main():
     cmd = [
         "pyinstaller",
         "--onefile",
-        "--windowed",
         "--name", "PyUNO_Final",
         "--add-data", f"assets{separator}assets",
         "--collect-all", "pygame",
@@ -70,18 +69,34 @@ def main():
         "main_game.py"
     ]
     
-    # Add icon if available
+    # Only add --windowed on non-Windows for now to debug Windows issues
+    if platform.system() != "Windows":
+        cmd.insert(2, "--windowed")  # Insert after --onefile
+        print("Added --windowed flag for non-Windows platform")
+    else:
+        print("Skipping --windowed on Windows for debugging")
+    
+    # Simplified icon handling - only use existing files, don't generate
     icon_file = None
     if platform.system() == "Windows" and os.path.exists("assets/uno_logo.ico"):
         icon_file = "assets/uno_logo.ico"
-    elif os.path.exists("assets/uno_logo.png"):
+        print(f"✓ Found existing ICO file: {icon_file}")
+    elif platform.system() == "Darwin" and os.path.exists("assets/uno_logo.png"):
         icon_file = "assets/uno_logo.png"
+        print(f"✓ Using PNG for macOS: {icon_file}")
+    elif os.path.exists("assets/uno_logo.png"):
+        # Only use PNG on non-Windows if no ICO exists
+        if platform.system() != "Windows":
+            icon_file = "assets/uno_logo.png"
+            print(f"✓ Using PNG icon: {icon_file}")
+        else:
+            print("⚠️  PNG found but skipping on Windows (no ICO available)")
     
     if icon_file:
         cmd.extend(["--icon", icon_file])
         print(f"✓ Using icon: {icon_file}")
     else:
-        print("⚠️  No icon file found")
+        print("⚠️  No icon file used (may help with Windows debugging)")
     
     print(f"Command: {' '.join(cmd)}")
     print(f"Data separator: '{separator}' for {platform.system()}")

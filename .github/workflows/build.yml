@@ -64,6 +64,14 @@ jobs:
         python build_minimal.py
       continue-on-error: true
 
+    - name: Windows-specific debug (if Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        echo "=== Windows-Specific Debugging ==="
+        echo "Running comprehensive Windows CI diagnostic"
+        python build_debug_windows.py
+      continue-on-error: true
+
     - name: Try full build if minimal works
       run: |
         echo "=== Attempting Full Build ==="

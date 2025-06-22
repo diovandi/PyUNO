@@ -37,6 +37,14 @@ def main():
     print("Note: NO --windowed, NO --add-data, NO --collect-all, NO --icon")
     print("This should work if PyInstaller itself works")
     
+    # For Windows debugging, also try without any pygame imports in the command
+    # pygame should be auto-detected by PyInstaller via import analysis
+    if platform.system() == "Windows":
+        print("Windows detected - using ultra-minimal approach")
+        print("PyInstaller will auto-detect pygame dependencies")
+    else:
+        print("Non-Windows platform - minimal build should work normally")
+    
     try:
         print("\nStarting minimal build...")
         result = subprocess.run(cmd, text=True, capture_output=False)
