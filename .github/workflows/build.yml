@@ -64,6 +64,10 @@ jobs:
         python --version
         echo "PyInstaller version:"
         pyinstaller --version
+        echo "System info:"
+        uname -a || echo "uname not available"
+        echo "Available tools:"
+        which iconutil || echo "iconutil not found"
         echo "Starting build..."
         python build_final.py
 

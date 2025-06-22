@@ -67,52 +67,9 @@ def ensure_icon_exists(platform_info):
         return str(icon_path) if icon_path.exists() else None
         
     elif platform_info['icon_format'] == 'icns':
-        icon_path = Path("assets/uno_logo.icns")
-        if png_path.exists() and not icon_path.exists():
-            print("Creating ICNS file from PNG...")
-            try:
-                from PIL import Image
-                img = Image.open(png_path)
-                # Create ICNS with multiple sizes
-                sizes = [16, 32, 64, 128, 256, 512, 1024]
-                icon_path_str = str(icon_path)
-                
-                # Use iconutil if available (macOS), otherwise use Pillow
-                if shutil.which('iconutil'):
-                    try:
-                        iconset_path = "assets/uno_logo.iconset"
-                        os.makedirs(iconset_path, exist_ok=True)
-                        
-                        for size in sizes:
-                            resized = img.resize((size, size), Image.Resampling.LANCZOS)
-                            resized.save(f"{iconset_path}/icon_{size}x{size}.png")
-                            if size <= 512:  # Create @2x versions
-                                resized_2x = img.resize((size*2, size*2), Image.Resampling.LANCZOS)
-                                resized_2x.save(f"{iconset_path}/icon_{size}x{size}@2x.png")
-                        
-                        result = subprocess.run(['iconutil', '-c', 'icns', iconset_path], 
-                                              capture_output=True, text=True)
-                        if result.returncode == 0:
-                            shutil.rmtree(iconset_path)
-                        else:
-                            print(f"iconutil failed: {result.stderr}")
-                            shutil.rmtree(iconset_path)
-                            return str(png_path)  # Fallback to PNG
-                    except Exception as e:
-                        print(f"iconutil creation failed: {e}")
-                        if os.path.exists(iconset_path):
-                            shutil.rmtree(iconset_path)
-                        return str(png_path)  # Fallback to PNG
-                else:
-                    # Fallback: just use PNG for macOS
-                    print("iconutil not available, using PNG fallback")
-                    return str(png_path)
-                    
-                print("✓ ICNS file created successfully")
-            except Exception as e:
-                print(f"Warning: Could not create ICNS file: {e}")
-                return str(png_path)  # Fallback to PNG
-        return str(icon_path) if icon_path.exists() else str(png_path)
+        # For now, always use PNG on macOS to avoid iconutil issues
+        print("Using PNG icon for macOS (ICNS creation disabled for stability)")
+        return str(png_path) if png_path.exists() else None
         
     else:  # Linux - use PNG
         return str(png_path) if png_path.exists() else None
@@ -265,19 +222,31 @@ def create_final_executable():
     
     platform_info = get_platform_info()
     print(f"Creating PyUNO executable for {platform_info['name']}...")
+    print(f"Platform details: {platform_info}")
     
     # Check if PyInstaller is installed
     try:
         import PyInstaller
+        print(f"PyInstaller version: {PyInstaller.__version__}")
     except ImportError:
         print("Installing PyInstaller...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
     
     # Ensure platform-appropriate icon exists
-    icon_path = ensure_icon_exists(platform_info)
+    try:
+        icon_path = ensure_icon_exists(platform_info)
+        print(f"Icon path: {icon_path}")
+    except Exception as e:
+        print(f"Warning: Icon creation failed: {e}")
+        icon_path = None
     
     # Create patched UI file
-    create_patched_ui_file()
+    try:
+        create_patched_ui_file()
+        print("✓ UI file patched successfully")
+    except Exception as e:
+        print(f"Warning: UI patching failed: {e}")
+        # Continue without patching for now
     
     # Copy other necessary files
     shutil.copytree('src', 'build_temp/src', dirs_exist_ok=True)
@@ -308,16 +277,12 @@ def create_final_executable():
     
     # Add platform-specific options
     if platform_info['name'] == 'macOS':
-        # macOS-specific options
-        try:
-            cmd.extend([
-                "--target-architecture", "universal2",  # Support both Intel and Apple Silicon
-                "--osx-bundle-identifier", "com.pyuno.game"
-            ])
-        except Exception as e:
-            print(f"Warning: Could not set Universal2 architecture: {e}")
-            # Fallback to native architecture only
-            pass
+        # macOS-specific options - simplified to avoid Universal2 issues
+        cmd.extend([
+            "--osx-bundle-identifier", "com.pyuno.game"
+        ])
+        # Note: Removed Universal2 for now to avoid build issues
+        print("Building for native macOS architecture (Universal2 disabled for stability)")
     
     # Add icon if available
     if icon_path:
