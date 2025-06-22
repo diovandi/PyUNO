@@ -326,7 +326,7 @@ def main_game_ui(game):
                                 if uno_qte_active:
                                     # QTE successful - call UNO
                                     if game.call_uno(current_player):
-                                        draw_message = "UNO called! QTE Success!"
+                                        draw_message = "UNO called!"
                                         draw_message_time = current_time
                                         uno_qte_active = False
                                         # Advance the turn since UNO was called successfully
