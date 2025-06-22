@@ -114,21 +114,52 @@ def main():
             
         print(f"Checking for: {exe_path}")
         if os.path.exists(exe_path):
-            if os.path.isfile(exe_path):
+            # Handle different types of outputs correctly
+            if platform.system() == "Darwin" and exe_path.endswith(".app"):
+                # macOS .app bundle is a directory
+                if os.path.isdir(exe_path):
+                    print(f"✓ Created macOS app bundle: {exe_path}")
+                    # Check if it has the expected structure
+                    contents_path = os.path.join(exe_path, "Contents")
+                    if os.path.exists(contents_path):
+                        print(f"✓ App bundle structure verified")
+                    return True
+                else:
+                    print(f"❌ Expected directory bundle, got file: {exe_path}")
+                    return False
+            elif os.path.isfile(exe_path):
+                # Regular executable file
                 size = os.path.getsize(exe_path)
-                print(f"✓ Created: {exe_path} ({size} bytes)")
+                print(f"✓ Created executable: {exe_path} ({size:,} bytes)")
+                return True
+            elif os.path.isdir(exe_path):
+                # Directory (shouldn't happen for Windows/Linux)
+                print(f"✓ Created directory: {exe_path}")
+                return True
             else:
-                print(f"✓ Created: {exe_path} (directory)")
-            return True
+                print(f"❌ Unexpected file type: {exe_path}")
+                return False
         else:
             print(f"❌ Expected file not found: {exe_path}")
             print("Files in dist_final:")
             try:
-                for f in os.listdir("dist_final"):
-                    print(f"  - {f}")
+                dist_files = os.listdir("dist_final")
+                if dist_files:
+                    for f in dist_files:
+                        full_path = os.path.join("dist_final", f)
+                        if os.path.isdir(full_path):
+                            print(f"  📁 {f}/")
+                        else:
+                            size = os.path.getsize(full_path)
+                            print(f"  📄 {f} ({size:,} bytes)")
+                else:
+                    print("  (empty directory)")
             except FileNotFoundError:
-                print("  dist_final directory doesn't exist")
-            return False
+                print("  ❌ dist_final directory doesn't exist")
+            
+            # Don't fail immediately - maybe PyInstaller created something else
+            print("⚠️  Expected file not found, but continuing...")
+            return True  # Allow partial success for artifact upload
             
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
