@@ -356,7 +356,7 @@ def main_game_ui(game: Game):
         button_width = 120
         button_height = 50
         button_center_x = current_width / 2
-        button_center_y = current_height - card_height - 70
+        button_center_y = current_height / 2 + card_height + 50
 
         uno_button_rect = pygame.Rect(0, 0, button_width, button_height)
         uno_button_rect.center = (button_center_x, button_center_y)
