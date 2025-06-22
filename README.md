@@ -76,4 +76,4 @@ This implementation follows standard UNO rules with support for:
 
 ## Credits
 
-Developed by Group 19 for FH-SWF. 
+Developed by Group 19 for the Basics in Python course at FH-SWF. 
