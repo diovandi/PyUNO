@@ -74,148 +74,7 @@ def ensure_icon_exists(platform_info):
     else:  # Linux - use PNG
         return str(png_path) if png_path.exists() else None
 
-def create_patched_ui_file():
-    """Create a patched version of uno_ui.py that uses proper resource paths"""
-    
-    # Read the original UI file
-    with open('src/pyuno/ui/uno_ui.py', 'r') as f:
-        content = f.read()
-    
-    # Patch the imports and path functions
-    patch_imports = """import pygame
-import sys
-import os
-import time
-from ..core.uno_classes import Game, Player, Card
-from ..config.font_config import get_font_config
-from ..utils.resource_path import get_asset_path, get_font_path, resource_exists
-"""
-
-    # Patch the logo loading
-    patch_logo = """
-# Get the path to assets directory using resource path utility
-logo_path = get_asset_path('uno_logo.png')
-if os.path.exists(logo_path):
-    uno_logo_original = pygame.image.load(logo_path).convert_alpha()
-    pygame.display.set_icon(uno_logo_original)
-else:
-    print("Warning: Logo not found, using default icon")
-    uno_logo_original = pygame.Surface((64, 64))
-    uno_logo_original.fill((255, 0, 0))
-"""
-
-    # Patch the font path function
-    patch_font_func = """def get_font_path(font_filename):
-    \"\"\"
-    Get the absolute path to a font file in the assets directory
-    \"\"\"
-    return get_font_path(font_filename)
-"""
-
-    # Patch the card loading function
-    patch_card_func = """def load_card_images(card_width, card_height):
-    card_images = {}
-    
-    COLORS = ["red", "yellow", "green", "blue"]
-    VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
-    SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
-
-    for color in COLORS:
-        for value in VALUES:
-            card_name = f"{color}_{value}"
-            file_path = get_asset_path(f"{card_name}.png")
-            try:
-                if os.path.exists(file_path):
-                    image = pygame.image.load(file_path).convert_alpha()
-                    card_images[card_name] = pygame.transform.scale(image, (card_width, card_height))
-            except pygame.error:
-                pass
-
-    for card_name in SPECIAL_CARDS:
-        file_path = get_asset_path(f"{card_name}.png")
-        try:
-            if os.path.exists(file_path):
-                image = pygame.image.load(file_path).convert_alpha()
-                card_images[card_name] = pygame.transform.scale(image, (card_width, card_height))
-        except pygame.error:
-            pass
-            
-    file_path = get_asset_path("card_back.png")
-    try:
-        if os.path.exists(file_path):
-            image = pygame.image.load(file_path).convert_alpha()
-            card_images["card_back"] = pygame.transform.scale(image, (card_width, card_height))
-    except pygame.error:
-        pass
-
-    return card_images
-"""
-
-    # Apply patches
-    lines = content.split('\n')
-    patched_lines = []
-    skip_until = None
-    
-    for i, line in enumerate(lines):
-        if skip_until and i <= skip_until:
-            continue
-        skip_until = None
-            
-        if line.startswith('import pygame'):
-            # Replace imports section
-            patched_lines.extend(patch_imports.strip().split('\n'))
-            # Skip original imports
-            j = i + 1
-            while j < len(lines) and (lines[j].startswith('import ') or lines[j].startswith('from ') or lines[j].strip() == ''):
-                j += 1
-            skip_until = j - 1
-            continue
-            
-        elif 'project_root = os.path.dirname' in line:
-            # Replace logo loading section
-            patched_lines.extend(patch_logo.strip().split('\n'))
-            # Skip until after pygame.display.set_icon
-            j = i
-            while j < len(lines) and 'pygame.display.set_icon' not in lines[j]:
-                j += 1
-            skip_until = j
-            continue
-            
-        elif line.startswith('def get_font_path('):
-            # Replace font path function
-            patched_lines.extend(patch_font_func.strip().split('\n'))
-            # Skip until next function
-            j = i + 1
-            indent_level = len(line) - len(line.lstrip())
-            while j < len(lines):
-                current_line = lines[j]
-                if current_line.strip() and len(current_line) - len(current_line.lstrip()) <= indent_level:
-                    break
-                j += 1
-            skip_until = j - 1
-            continue
-            
-        elif line.startswith('def load_card_images('):
-            # Replace card loading function
-            patched_lines.extend(patch_card_func.strip().split('\n'))
-            # Skip until next function
-            j = i + 1
-            indent_level = len(line) - len(line.lstrip())
-            while j < len(lines):
-                current_line = lines[j]
-                if current_line.strip() and len(current_line) - len(current_line.lstrip()) <= indent_level:
-                    break
-                j += 1
-            skip_until = j - 1
-            continue
-            
-        else:
-            patched_lines.append(line)
-    
-    # Write patched file
-    os.makedirs('build_temp/src/pyuno/ui', exist_ok=True)
-    with open('build_temp/src/pyuno/ui/uno_ui.py', 'w') as f:
-        f.write('\n'.join(patched_lines))
+# Removed create_patched_ui_file function - using original files for stability
 
 def create_final_executable():
     """Create the final working executable with cross-platform support"""
@@ -240,53 +99,56 @@ def create_final_executable():
         print(f"Warning: Icon creation failed: {e}")
         icon_path = None
     
-    # Create patched UI file
+    # Skip UI patching for now - use original files
+    print("Using original source files (skipping patching for stability)")
+    
+    # Copy source files directly
     try:
-        create_patched_ui_file()
-        print("✓ UI file patched successfully")
+        if os.path.exists('build_temp'):
+            shutil.rmtree('build_temp')
+        
+        # Copy main source
+        shutil.copytree('src', 'build_temp/src', dirs_exist_ok=True)
+        shutil.copy('main_game.py', 'build_temp/')
+        print("✓ Source files copied successfully")
+        
     except Exception as e:
-        print(f"Warning: UI patching failed: {e}")
-        # Continue without patching for now
-    
-    # Copy other necessary files
-    shutil.copytree('src', 'build_temp/src', dirs_exist_ok=True)
-    shutil.copy('main_game.py', 'build_temp/')
-    
-    # Copy the utils module
-    shutil.copytree('src/pyuno/utils', 'build_temp/src/pyuno/utils', dirs_exist_ok=True)
+        print(f"Error copying source files: {e}")
+        return False
     
     # Platform-specific settings
     separator = platform_info['separator']
     
-    # Build command
+    # Build command - simplified for stability
     cmd = [
         "pyinstaller",
         "--onefile",
-        platform_info['windowed_flag'],
         "--name", "PyUNO_Final",
         f"--add-data=assets{separator}assets",
         "--hidden-import", "pygame",
-        "--hidden-import", "PIL",
         "--collect-all", "pygame",
         "--distpath", "dist_final",
         "--workpath", "build_final",
         "--specpath", ".",
-        "--noconfirm",
-        "build_temp/main_game.py"
+        "--noconfirm"
     ]
+    
+    # Add windowed flag carefully
+    if platform_info['windowed_flag']:
+        cmd.append(platform_info['windowed_flag'])
     
     # Add platform-specific options
     if platform_info['name'] == 'macOS':
-        # macOS-specific options - simplified to avoid Universal2 issues
-        cmd.extend([
-            "--osx-bundle-identifier", "com.pyuno.game"
-        ])
-        # Note: Removed Universal2 for now to avoid build issues
-        print("Building for native macOS architecture (Universal2 disabled for stability)")
+        cmd.extend(["--osx-bundle-identifier", "com.pyuno.game"])
+        print("Building for native macOS architecture")
     
     # Add icon if available
-    if icon_path:
+    if icon_path and os.path.exists(icon_path):
         cmd.extend(["--icon", icon_path])
+        print(f"Using icon: {icon_path}")
+    
+    # Add the main script
+    cmd.append("build_temp/main_game.py")
     
     try:
         print(f"Running: {' '.join(cmd)}")
