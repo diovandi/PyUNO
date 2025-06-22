@@ -1,5 +1,7 @@
 build/
 dist_final/
+!dist_final/PyUNO_Final.exe
+!dist_final/run_pyuno_final.bat
 dist_minimal/
 
 # Build artifacts and temporary files
