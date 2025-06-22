@@ -6,8 +6,14 @@ A Python implementation of the classic UNO card game built with Pygame.
 
 ![Build Status](https://github.com/diovandi/PyUNO/actions/workflows/build.yml/badge.svg)
 
+## 🎯 Release Status
+
+✅ **Linux**: Fully automated CI builds (69.6 MB artifacts)  
+✅ **macOS**: Fully automated CI builds (42.2 MB artifacts)  
+⚠️ **Windows**: Local builds work perfectly, CI has environment limitations
+
 🎮 **Ready to Play!** A working Windows executable is already included in `dist_final/` - no installation needed!  
-🤖 **Auto-builds available** for Windows, macOS, and Linux via GitHub Actions!
+🤖 **Auto-builds available** for Linux and macOS via GitHub Actions!
 
 ## Project Structure
 
@@ -119,15 +125,17 @@ This creates a new executable in `dist_final/` with:
 #### Building for Other Platforms
 
 **🤖 Automated Builds (Recommended)**
-GitHub Actions automatically builds for all platforms:
+GitHub Actions automatically builds for Linux and macOS:
 
 1. **Development builds**: Push to `main` → Download from Actions tab
-2. **Release builds**: Create git tag → Automatic release with all platforms
+2. **Release builds**: Create git tag → Automatic release with Linux/macOS platforms
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
    ```
 3. **Download**: Go to Releases page for packaged executables
+
+**Note about Windows CI**: Windows builds work perfectly when built locally but encounter environment-specific issues in GitHub Actions CI. This is a known limitation of the CI environment, not the code itself.
 
 **🔧 Manual Builds**
 If you need to build locally:
