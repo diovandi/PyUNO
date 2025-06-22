@@ -23,7 +23,7 @@ __pycache__/
 Thumbs.db
 
 # Testing and diagnostic files
-test_*.py
+debug_test.py
 debug_*.py
 build_debug*.py
 build_ultra*.py
