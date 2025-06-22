@@ -266,10 +266,15 @@ def main_game_ui(game):
                                 if hovered_card_to_play_index != -1:
                                     card_to_play = current_player.hand[hovered_card_to_play_index]
                                     if game.play_card(current_player, card_to_play):
+                                        # Check if player now has 1 card and needs to call UNO
+                                        if current_player.has_one_card() and not current_player.has_called_uno:
+                                            # Automatically call UNO for the player
+                                            if game.call_uno(current_player):
+                                                draw_message = "UNO called!"
+                                                draw_message_time = current_time
                                         if game.is_ai_turn:  # Only add delay if next player is AI
                                             last_turn_time = current_time
                                             waiting_for_turn = True
-                                        
                         if uno_button_rect.collidepoint(mouse_pos):
                             current_player = game.get_current_player()
                             if current_player == game.players[0]:  # Human player
@@ -412,13 +417,10 @@ def main_game_ui(game):
                             highlight_rect = pygame.Rect(pos[0] - 5, pos[1] - 5, card_height + 10, card_width + 10)
                             pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)
 
-        pygame.draw.rect(screen, BLACK, uno_button_rect, border_radius=10)
-        draw_text("UNO!", uno_button_font, WHITE, screen, uno_button_rect.centerx, uno_button_rect.centery)
-
         # Check if current player has 1 card and hasn't called UNO
         needs_uno_call = current_player.has_one_card() and not current_player.has_called_uno
         
-        # Change button color based on UNO status
+        # Only show UNO button when player needs to call UNO
         if needs_uno_call and current_player == game.players[0]:  # Human player needs to call UNO
             pygame.draw.rect(screen, (255, 255, 0), uno_button_rect, border_radius=10)  # Yellow for warning
             draw_text("UNO!", uno_button_font, WHITE, screen, uno_button_rect.centerx, uno_button_rect.centery)
@@ -428,9 +430,6 @@ def main_game_ui(game):
             warning_surface = status_font.render(warning_text, True, (255, 255, 0))
             warning_rect = warning_surface.get_rect(center=(current_width / 2, current_height / 2 + card_height + 100))
             screen.blit(warning_surface, warning_rect)
-        else:
-            pygame.draw.rect(screen, BLACK, uno_button_rect, border_radius=10)
-            draw_text("UNO!", uno_button_font, WHITE, screen, uno_button_rect.centerx, uno_button_rect.centery)
 
         if game.waiting_for_color:
             draw_color_selection_menu(screen, current_width, current_height, button_font)
