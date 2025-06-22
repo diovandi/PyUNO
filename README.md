@@ -4,7 +4,7 @@
 
 A Python implementation of the classic UNO card game built with Pygame.
 
-![Build Status](https://github.com/YOUR_USERNAME/PyUNO/actions/workflows/build.yml/badge.svg)
+![Build Status](https://github.com/diovandi/PyUNO/actions/workflows/build.yml/badge.svg)
 
 🎮 **Ready to Play!** A working Windows executable is already included in `dist_final/` - no installation needed!  
 🤖 **Auto-builds available** for Windows, macOS, and Linux via GitHub Actions!
