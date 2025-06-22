@@ -480,9 +480,9 @@ def main_game_ui(game):
                             card_height + 10
                         )
                         
-                        # Check if this card is playable and highlight with green if so
+                        # Check if this card is playable and highlight with yellow if so
                         if card in playable_cards:
-                            pygame.draw.rect(screen, (0, 255, 0), highlight_rect, 3, border_radius=5)  # Green for eligible cards
+                            pygame.draw.rect(screen, (255, 255, 0), highlight_rect, 3, border_radius=5)  # Yellow for eligible cards
                         else:
                             pygame.draw.rect(screen, WHITE, highlight_rect, 2, border_radius=5)  # White for non-eligible
             else:  
