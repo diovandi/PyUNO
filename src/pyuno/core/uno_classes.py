@@ -151,6 +151,7 @@ class Game:
         self.direction = 1  # 1 for clockwise, -1 for counterclockwise
         self.game_started = False
         self.waiting_for_color = False
+        self.waiting_for_uno_call = False  # New state for UNO call management
         self.last_played_card = None
         self.is_ai_turn = False
         self.selected_color = None
@@ -194,6 +195,10 @@ class Game:
             return False
             
         if player.call_uno():
+            if self.waiting_for_uno_call:
+                self.waiting_for_uno_call = False
+                # Advance to next player after successful UNO call
+                self.next_player()
             return True
         return False
 
@@ -217,6 +222,24 @@ class Game:
             drawn_card = self.deck.draw_card()
             if drawn_card:
                 player.add_card(drawn_card)
+
+    def handle_uno_timeout(self) -> bool:
+        """Handle UNO call timeout - apply penalty and advance turn. Returns True if timeout was handled."""
+        if not self.waiting_for_uno_call:
+            return False
+            
+        current_player = self.get_current_player()
+        current_time = time.time()
+        
+        # Check if enough time has passed since the last card was played
+        if current_time - self.last_card_played_time >= self.uno_call_window:
+            # Apply penalty for not calling UNO
+            self.apply_uno_penalty(current_player)
+            self.waiting_for_uno_call = False
+            # Advance to next player after penalty
+            self.next_player()
+            return True
+        return False
 
     def next_player(self):
         if self.skip_next_turn:
@@ -277,7 +300,26 @@ class Game:
         # Record the time when card was played for UNO penalty checking
         self.last_card_played_time = time.time()
 
-        # Handle special cards
+        # Check if player now has 1 card and needs to call UNO (for any player)
+        needs_uno_call = player.has_one_card() and not player.has_called_uno
+        if needs_uno_call:
+            self.waiting_for_uno_call = True
+            # For AI players, automatically call UNO
+            if player != self.players[0]:  # Not the human player
+                self.call_uno(player)
+                self.waiting_for_uno_call = False
+            else:
+                # For human player, handle special cards but don't advance turn yet
+                if card.value == "reverse":
+                    self.reverse_direction()
+                elif card.value == "drawfour":
+                    self.waiting_for_color = True
+                elif card.color == "wild":
+                    self.waiting_for_color = True
+                # Don't advance turn yet - wait for UNO call
+                return True
+
+        # Handle special cards normally when no UNO call is needed
         if card.value == "reverse":
             self.reverse_direction()
             # In 2-player games, reverse_direction() sets skip_next_turn = True
@@ -300,11 +342,6 @@ class Game:
         if card.color == "wild":
             self.waiting_for_color = True
             return True  # Don't advance to next player until color is chosen
-
-        # Check if human player now has 1 card and needs to call UNO
-        if player == self.players[0] and player.has_one_card() and not player.has_called_uno:
-            # Don't advance turn yet - let the QTE system handle the UNO call
-            return True
 
         # For normal cards, advance to next player
         self.next_player()

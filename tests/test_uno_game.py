@@ -420,12 +420,18 @@ class TestGame(unittest.TestCase):
             
             # Check if player will have one card after playing
             will_have_one_card = (initial_hand_size - 1) == 1
-            if will_have_one_card:
-                # Call UNO before playing to avoid the UNO penalty condition
-                self.game.call_uno(self.player1)
             
             self.assertTrue(self.game.play_card(self.player1, playable_card))
             self.assertEqual(len(self.player1.hand), initial_hand_size - 1)
+            
+            if will_have_one_card:
+                # Player should now need to call UNO
+                self.assertTrue(self.game.waiting_for_uno_call)
+                # Call UNO to complete the turn
+                self.assertTrue(self.game.call_uno(self.player1))
+                self.assertFalse(self.game.waiting_for_uno_call)
+            
+            # Turn should now be advanced
             self.assertEqual(self.game.current_player_index, 1)
         elif top_card:
             # If no non-wild card is playable, test with a wild card
@@ -439,9 +445,6 @@ class TestGame(unittest.TestCase):
                 
                 # Check if player will have one card after playing
                 will_have_one_card = (initial_hand_size - 1) == 1
-                if will_have_one_card:
-                    # Call UNO before playing to avoid the UNO penalty condition
-                    self.game.call_uno(self.player1)
                 
                 self.assertTrue(self.game.play_card(self.player1, playable_card))
                 self.assertEqual(len(self.player1.hand), initial_hand_size - 1)
@@ -449,6 +452,14 @@ class TestGame(unittest.TestCase):
                 
                 # Select a color to complete the turn
                 self.assertTrue(self.game.select_color("red"))
+                
+                if will_have_one_card:
+                    # Player should now need to call UNO
+                    self.assertTrue(self.game.waiting_for_uno_call)
+                    # Call UNO to complete the turn
+                    self.assertTrue(self.game.call_uno(self.player1))
+                    self.assertFalse(self.game.waiting_for_uno_call)
+                
                 self.assertEqual(self.game.current_player_index, 1)
     
     def test_play_card_invalid(self):

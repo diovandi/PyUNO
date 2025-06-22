@@ -260,29 +260,21 @@ def main_game_ui(game):
             last_turn_time = current_time
             waiting_for_turn = True
 
-        # UNO QTE Logic
+        # UNO QTE Logic - Use the new waiting_for_uno_call flag
         current_player = game.get_current_player()
-        if current_player == game.players[0]:  # Human player
-            if current_player.has_one_card() and not current_player.has_called_uno:
-                if not uno_qte_active:
-                    # Start UNO QTE
-                    uno_qte_active = True
-                    uno_qte_start_time = current_time
-                else:
-                    # Check if QTE time expired
-                    if current_time - uno_qte_start_time >= uno_qte_duration:
-                        # QTE failed - apply penalty
-                        game.apply_uno_penalty(current_player)
-                        draw_message = "UNO QTE Failed! Drew 2 cards."
-                        draw_message_time = current_time
-                        uno_qte_active = False
-                        # Now advance the turn since the QTE is complete
-                        game.next_player()
+        if current_player == game.players[0] and game.waiting_for_uno_call:  # Human player needs to call UNO
+            if not uno_qte_active:
+                # Start UNO QTE
+                uno_qte_active = True
+                uno_qte_start_time = current_time
             else:
-                # Player doesn't need to call UNO anymore
-                uno_qte_active = False
+                # Check if QTE time expired - let the game handle the timeout
+                if game.handle_uno_timeout():
+                    draw_message = "UNO QTE Failed! Drew 2 cards."
+                    draw_message_time = current_time
+                    uno_qte_active = False
         else:
-            # Not human player's turn
+            # Not waiting for UNO call anymore
             uno_qte_active = False
 
         if draw_message and current_time - draw_message_time >= draw_message_duration:
@@ -324,13 +316,11 @@ def main_game_ui(game):
                             # Check UNO button first (highest priority)
                             if uno_button_rect.collidepoint(mouse_pos):
                                 if uno_qte_active:
-                                    # QTE successful - call UNO
+                                    # QTE successful - call UNO (game logic handles turn advancement)
                                     if game.call_uno(current_player):
                                         draw_message = "UNO called!"
                                         draw_message_time = current_time
                                         uno_qte_active = False
-                                        # Advance the turn since UNO was called successfully
-                                        game.next_player()
                                     else:
                                         draw_message = "Invalid UNO call!"
                                         draw_message_time = current_time
