@@ -79,20 +79,33 @@ def ensure_icon_exists(platform_info):
                 
                 # Use iconutil if available (macOS), otherwise use Pillow
                 if shutil.which('iconutil'):
-                    iconset_path = "assets/uno_logo.iconset"
-                    os.makedirs(iconset_path, exist_ok=True)
-                    
-                    for size in sizes:
-                        resized = img.resize((size, size), Image.Resampling.LANCZOS)
-                        resized.save(f"{iconset_path}/icon_{size}x{size}.png")
-                        if size <= 512:  # Create @2x versions
-                            resized_2x = img.resize((size*2, size*2), Image.Resampling.LANCZOS)
-                            resized_2x.save(f"{iconset_path}/icon_{size}x{size}@2x.png")
-                    
-                    subprocess.run(['iconutil', '-c', 'icns', iconset_path], check=True)
-                    shutil.rmtree(iconset_path)
+                    try:
+                        iconset_path = "assets/uno_logo.iconset"
+                        os.makedirs(iconset_path, exist_ok=True)
+                        
+                        for size in sizes:
+                            resized = img.resize((size, size), Image.Resampling.LANCZOS)
+                            resized.save(f"{iconset_path}/icon_{size}x{size}.png")
+                            if size <= 512:  # Create @2x versions
+                                resized_2x = img.resize((size*2, size*2), Image.Resampling.LANCZOS)
+                                resized_2x.save(f"{iconset_path}/icon_{size}x{size}@2x.png")
+                        
+                        result = subprocess.run(['iconutil', '-c', 'icns', iconset_path], 
+                                              capture_output=True, text=True)
+                        if result.returncode == 0:
+                            shutil.rmtree(iconset_path)
+                        else:
+                            print(f"iconutil failed: {result.stderr}")
+                            shutil.rmtree(iconset_path)
+                            return str(png_path)  # Fallback to PNG
+                    except Exception as e:
+                        print(f"iconutil creation failed: {e}")
+                        if os.path.exists(iconset_path):
+                            shutil.rmtree(iconset_path)
+                        return str(png_path)  # Fallback to PNG
                 else:
                     # Fallback: just use PNG for macOS
+                    print("iconutil not available, using PNG fallback")
                     return str(png_path)
                     
                 print("✓ ICNS file created successfully")
@@ -296,10 +309,15 @@ def create_final_executable():
     # Add platform-specific options
     if platform_info['name'] == 'macOS':
         # macOS-specific options
-        cmd.extend([
-            "--target-architecture", "universal2",  # Support both Intel and Apple Silicon
-            "--osx-bundle-identifier", "com.pyuno.game"
-        ])
+        try:
+            cmd.extend([
+                "--target-architecture", "universal2",  # Support both Intel and Apple Silicon
+                "--osx-bundle-identifier", "com.pyuno.game"
+            ])
+        except Exception as e:
+            print(f"Warning: Could not set Universal2 architecture: {e}")
+            # Fallback to native architecture only
+            pass
     
     # Add icon if available
     if icon_path:
