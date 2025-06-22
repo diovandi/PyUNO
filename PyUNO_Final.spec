@@ -3,13 +3,13 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('assets', 'assets')]
 binaries = []
-hiddenimports = ['pygame', 'PIL']
+hiddenimports = []
 tmp_ret = collect_all('pygame')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['build_temp\\main_game.py'],
+    ['main_game.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

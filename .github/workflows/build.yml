@@ -60,16 +60,14 @@ jobs:
     - name: Build executable
       run: |
         echo "Building for platform: ${{ matrix.platform }}"
-        echo "Python version:"
-        python --version
-        echo "PyInstaller version:"
-        pyinstaller --version
-        echo "System info:"
-        uname -a || echo "uname not available"
-        echo "Available tools:"
-        which iconutil || echo "iconutil not found"
-        echo "Starting build..."
-        python build_final.py
+        echo "Files in current directory:"
+        ls -la
+        echo "Assets directory:"
+        ls -la assets/ || echo "Assets directory not found"
+        echo "Source directory:"
+        ls -la src/ || echo "Source directory not found"
+        echo "Using simple build script..."
+        python build_simple.py
 
     - name: Verify build output
       shell: bash
