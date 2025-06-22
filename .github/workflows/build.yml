@@ -64,12 +64,56 @@ jobs:
         python build_minimal.py
       continue-on-error: true
 
+    - name: Windows absolute minimal test (if Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        echo "=== Windows Absolute Minimal Test ==="
+        echo "Testing if basic Python execution works"
+        python test_minimal.py
+      continue-on-error: true
+
     - name: Windows ultra-basic debug (if Windows)
       if: matrix.platform == 'windows'
       run: |
         echo "=== Windows Ultra-Basic Debugging ==="
         echo "Testing each component separately to isolate failure point"
-        python build_ultra_basic.py
+        python build_ultra_basic.py || echo "Ultra-basic diagnostic failed - checking why..."
+      continue-on-error: true
+
+    - name: Windows error details (if Windows)
+      if: matrix.platform == 'windows'
+      shell: cmd
+      run: |
+        echo === Windows Environment Details ===
+        echo Python executable location:
+        where python
+        echo Python version:
+        python --version
+        echo Pip list:
+        python -m pip list
+        echo Environment variables:
+        set | findstr -i python
+        echo Current directory contents:
+        dir
+      continue-on-error: true
+
+    - name: Windows fallback build (if Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        echo "=== Windows Fallback Build ==="
+        echo "Testing PyInstaller with simple program (no pygame)"
+        python -m PyInstaller --onefile --name PyUNO_Simple --distpath dist_fallback --noconfirm main_simple.py
+        echo "Checking fallback build results:"
+        if (Test-Path "dist_fallback/PyUNO_Simple.exe") {
+          $size = (Get-Item "dist_fallback/PyUNO_Simple.exe").Length
+          Write-Host "✓ Fallback executable created: PyUNO_Simple.exe ($size bytes)"
+          Write-Host "Testing fallback executable:"
+          & "dist_fallback/PyUNO_Simple.exe"
+        } else {
+          Write-Host "❌ Fallback executable not created"
+          Write-Host "Checking dist_fallback directory:"
+          if (Test-Path "dist_fallback") { Get-ChildItem "dist_fallback" } else { Write-Host "dist_fallback not created" }
+        }
       continue-on-error: true
 
     - name: Try full build if minimal works
