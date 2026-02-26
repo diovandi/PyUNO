@@ -93,6 +93,60 @@ class TestCard(unittest.TestCase):
         self.assertTrue(card1.can_play_on(wild_card, "red"))
         self.assertFalse(card1.can_play_on(wild_card, "blue"))
 
+    def test_card_equality(self):
+        """Test card equality logic."""
+        card1 = Card("red", "5")
+        card2 = Card("red", "5")
+        card3 = Card("blue", "5")
+        card4 = Card("red", "7")
+        wild1 = Card("wild", "standard")
+        wild2 = Card("wild", "standard")
+        wild3 = Card("wild", "drawfour")
+
+        # Identical cards should be equal
+        self.assertEqual(card1, card2)
+        self.assertEqual(wild1, wild2)
+
+        # Different color
+        self.assertNotEqual(card1, card3)
+
+        # Different value
+        self.assertNotEqual(card1, card4)
+
+        # Wild vs wild
+        self.assertNotEqual(wild1, wild3)
+
+        # Wild vs colored
+        self.assertNotEqual(wild1, card1)
+
+        # Not a card
+        self.assertNotEqual(card1, "red_5")
+        self.assertNotEqual(card1, None)
+
+    def test_card_hashing(self):
+        """Test card hashing logic."""
+        card1 = Card("red", "5")
+        card2 = Card("red", "5")
+        card3 = Card("blue", "5")
+
+        # Identical cards should have same hash
+        self.assertEqual(hash(card1), hash(card2))
+
+        # Different cards should ideally have different hashes
+        # (Though hash collisions are possible, they are unlikely for these simple tuples)
+        self.assertNotEqual(hash(card1), hash(card3))
+
+        # Test in a set
+        card_set = {card1, card2, card3}
+        self.assertEqual(len(card_set), 2)
+        self.assertIn(card1, card_set)
+        self.assertIn(card2, card_set)
+        self.assertIn(card3, card_set)
+
+        # Test in a dictionary
+        card_dict = {card1: "first", card3: "third"}
+        self.assertEqual(card_dict[card2], "first")
+
 
 class TestDeck(unittest.TestCase):
     """Test cases for the Deck class."""
