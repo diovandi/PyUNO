@@ -2,10 +2,9 @@ import unittest
 from unittest.mock import MagicMock, patch, call
 import sys
 import os
-import pygame
-
 # Set dummy driver just in case
 os.environ["SDL_VIDEODRIVER"] = "dummy"
+import pygame
 
 # Add src to path
 sys.path.append(os.path.join(os.getcwd(), 'src'))
