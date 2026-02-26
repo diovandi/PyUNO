@@ -29,17 +29,5 @@ class TestFontConfig(unittest.TestCase):
         self.assertIn('file', config)
         self.assertIn('fallback', config)
 
-    def test_get_font_config_return_structure(self):
-        """Verify the returned configuration always has 'file' and 'fallback' keys."""
-        # Test with a known type
-        config_known = get_font_config('title')
-        self.assertIn('file', config_known)
-        self.assertIn('fallback', config_known)
-
-        # Test with an unknown type
-        config_unknown = get_font_config('non_existent')
-        self.assertIn('file', config_unknown)
-        self.assertIn('fallback', config_unknown)
-
 if __name__ == '__main__':
     unittest.main()
