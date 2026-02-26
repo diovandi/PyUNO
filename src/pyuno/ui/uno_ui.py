@@ -98,29 +98,44 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
+    # Initial setup
+    current_width = screen.get_width()
+    current_height = screen.get_height()
+
+    def update_ui_elements(width, height):
+        logo_h = int(height * 0.5)
+        logo_w = int(uno_logo_original.get_width() * (logo_h / uno_logo_original.get_height()))
+        logo_scaled = pygame.transform.scale(uno_logo_original, (logo_w, logo_h))
+        logo_r = logo_scaled.get_rect(center=(width / 2, height * 0.35))
+
+        c_font_size = int(height * 0.04)
+        c_font = load_font_by_type('credit', c_font_size)
+
+        btn_w = int(width * 0.25)
+        btn_h = int(height * 0.12)
+        btn_x = width / 2 - btn_w / 2
+        btn_y = height * 0.7 - btn_h / 2
+        start_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+        s_font_size = int(btn_h * 0.6)
+        s_font = load_font_by_type('start_button', s_font_size)
+        
+        return logo_scaled, logo_r, c_font, start_btn, s_font
+
+    uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
+
     while True:
-        current_width = screen.get_width()
-        current_height = screen.get_height()
+        # Check for resize
+        new_width = screen.get_width()
+        new_height = screen.get_height()
+        
+        if new_width != current_width or new_height != current_height:
+            current_width = new_width
+            current_height = new_height
+            uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
 
         screen.fill(BLACK)
-
-        logo_height = int(current_height * 0.5)
-        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-        uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-        logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
         screen.blit(uno_logo_scaled, logo_rect)
-        
-        credit_font_size = int(current_height * 0.04)
-        credit_font = load_font_by_type('credit', credit_font_size)
-
-        button_width = int(current_width * 0.25)
-        button_height = int(current_height * 0.12)
-        button_x = current_width / 2 - button_width / 2
-        button_y = current_height * 0.7 - button_height / 2
-        start_button = pygame.Rect(button_x, button_y, button_width, button_height)
-        
-        start_font_size = int(button_height * 0.6)
-        start_font = load_font_by_type('start_button', start_font_size)
 
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
 
