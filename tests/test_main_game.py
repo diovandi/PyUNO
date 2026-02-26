@@ -2,54 +2,66 @@ import unittest
 from unittest.mock import patch, MagicMock
 import sys
 import os
+import importlib
 
 # Add project root to sys.path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# Mock pygame before importing anything that uses it
-sys.modules['pygame'] = MagicMock()
-
-# Import the function to be tested
-# We try to import main_game, which imports src.pyuno.ui.uno_ui, which imports pygame
-from main_game import initialize_game
-
 class TestMainGame(unittest.TestCase):
 
-    @patch('main_game.Game')
-    @patch('main_game.Player')
-    def test_initialize_game(self, mock_player, mock_game):
+    def test_initialize_game(self):
         """Test the initialize_game function."""
-        # Setup mocks
-        mock_game_instance = mock_game.return_value
+        # Mock pygame and uno_ui in sys.modules for the duration of this test
+        # We need to include src.pyuno.ui.uno_ui because main_game imports it
+        with patch.dict(sys.modules, {'pygame': MagicMock(), 'src.pyuno.ui.uno_ui': MagicMock()}):
 
-        # Create player mocks
-        player_mocks = [MagicMock(name=f"Player {i+1}") for i in range(4)]
-        mock_player.side_effect = player_mocks
+            # Import main_game inside the patched environment
+            # If main_game was already imported, we reload it to ensure mocks are used
+            # If it wasn't, we import it fresh
+            try:
+                import main_game
+                importlib.reload(main_game)
+            except ImportError:
+                # If import fails (e.g. due to missing deps), we might need to mock more
+                # But with pygame mocked, it should be fine.
+                raise
 
-        # Call the function under test
-        game = initialize_game()
+            # Use patch.object on the module we just imported/reloaded
+            # This ensures we are patching the Game/Player classes used by THAT module instance
+            with patch.object(main_game, 'Game') as mock_game_class, \
+                 patch.object(main_game, 'Player') as mock_player_class:
 
-        # Verify Game was instantiated
-        mock_game.assert_called_once()
+                # Setup mocks
+                mock_game_instance = mock_game_class.return_value
 
-        # Verify Players were created with correct names
-        expected_names = ["Player 1", "Player 2", "Player 3", "Player 4"]
-        self.assertEqual(mock_player.call_count, 4)
-        actual_names = [call.args[0] for call in mock_player.call_args_list]
-        self.assertEqual(actual_names, expected_names)
+                # Create player mocks
+                player_mocks = [MagicMock(name=f"Player {i+1}") for i in range(4)]
+                mock_player_class.side_effect = player_mocks
 
-        # Verify players were added to game
-        self.assertEqual(mock_game_instance.add_player.call_count, 4)
-        for player_mock in player_mocks:
-            mock_game_instance.add_player.assert_any_call(player_mock)
+                # Call the function under test
+                game = main_game.initialize_game()
 
-        # Verify game.start_game() was called
-        mock_game_instance.start_game.assert_called_once()
+                # Verify Game was instantiated
+                mock_game_class.assert_called_once()
 
-        # Verify return value
-        self.assertEqual(game, mock_game_instance)
+                # Verify Players were created with correct names
+                expected_names = ["Player 1", "Player 2", "Player 3", "Player 4"]
+                self.assertEqual(mock_player_class.call_count, 4)
+                actual_names = [call.args[0] for call in mock_player_class.call_args_list]
+                self.assertEqual(actual_names, expected_names)
+
+                # Verify players were added to game
+                self.assertEqual(mock_game_instance.add_player.call_count, 4)
+                for player_mock in player_mocks:
+                    mock_game_instance.add_player.assert_any_call(player_mock)
+
+                # Verify game.start_game() was called
+                mock_game_instance.start_game.assert_called_once()
+
+                # Verify return value
+                self.assertEqual(game, mock_game_instance)
 
 if __name__ == '__main__':
     unittest.main()
