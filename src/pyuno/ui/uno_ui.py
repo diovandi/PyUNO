@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import time
+from functools import lru_cache
 from ..core.uno_classes import Game, Player, Card
 from ..config.font_config import get_font_config
 
@@ -74,6 +75,7 @@ def load_font_safe(font_path, size, fallback_font=None):
     # Last resort: use default pygame font
     return pygame.font.Font(None, size)
 
+@lru_cache(maxsize=32)
 def load_font_by_type(font_type, size):
     """
     Load a font using the font configuration system
@@ -163,6 +165,7 @@ def start_menu():
 
         pygame.display.update()
 
+@lru_cache(maxsize=1)
 def load_card_images(card_width, card_height):
     card_images = {}
     card_path = os.path.join(PROJECT_ROOT, 'assets')
