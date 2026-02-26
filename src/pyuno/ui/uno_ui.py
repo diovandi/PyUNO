@@ -98,29 +98,45 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
+    # Initialize state for resizing logic
+    last_width = 0
+    last_height = 0
+
+    # Pre-declare variables that depend on size
+    uno_logo_scaled = None
+    logo_rect = None
+    credit_font = None
+    start_button = None
+    start_font = None
+
     while True:
         current_width = screen.get_width()
         current_height = screen.get_height()
 
+        # Check if resize happened or if it's the first frame
+        if current_width != last_width or current_height != last_height:
+            last_width = current_width
+            last_height = current_height
+
+            logo_height = int(current_height * 0.5)
+            logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
+            uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
+            logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
+
+            credit_font_size = int(current_height * 0.04)
+            credit_font = load_font_by_type('credit', credit_font_size)
+
+            button_width = int(current_width * 0.25)
+            button_height = int(current_height * 0.12)
+            button_x = current_width / 2 - button_width / 2
+            button_y = current_height * 0.7 - button_height / 2
+            start_button = pygame.Rect(button_x, button_y, button_width, button_height)
+
+            start_font_size = int(button_height * 0.6)
+            start_font = load_font_by_type('start_button', start_font_size)
+
         screen.fill(BLACK)
-
-        logo_height = int(current_height * 0.5)
-        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-        uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-        logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
         screen.blit(uno_logo_scaled, logo_rect)
-        
-        credit_font_size = int(current_height * 0.04)
-        credit_font = load_font_by_type('credit', credit_font_size)
-
-        button_width = int(current_width * 0.25)
-        button_height = int(current_height * 0.12)
-        button_x = current_width / 2 - button_width / 2
-        button_y = current_height * 0.7 - button_height / 2
-        start_button = pygame.Rect(button_x, button_y, button_width, button_height)
-        
-        start_font_size = int(button_height * 0.6)
-        start_font = load_font_by_type('start_button', start_font_size)
 
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
 
@@ -230,6 +246,10 @@ def main_game_ui(game):
     uno_qte_start_time = 0
     uno_qte_duration = 3.0  # 3 seconds to call UNO
     uno_qte_button_rect = None
+
+    # Cached surfaces
+    cached_status_bg_surface = None
+    cached_status_bg_size = None
 
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
@@ -384,9 +404,13 @@ def main_game_ui(game):
         text_surface = status_font.render(status_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.35))
         bg_rect = text_rect.copy().inflate(20, 10)
-        bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 150))
-        screen.blit(bg_surface, bg_rect)
+
+        if cached_status_bg_surface is None or bg_rect.size != cached_status_bg_size:
+            cached_status_bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+            cached_status_bg_surface.fill((0, 0, 0, 150))
+            cached_status_bg_size = bg_rect.size
+
+        screen.blit(cached_status_bg_surface, bg_rect)
         screen.blit(text_surface, text_rect)
 
         if draw_message:
