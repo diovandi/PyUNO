@@ -85,5 +85,76 @@ class TestStartMenuOptimization(unittest.TestCase):
         self.assertEqual(mock_load_font_func.call_count, 4, "Optimization failed: Too many font loads")
         self.assertEqual(mock_pygame_module.transform.scale.call_count, 2, "Optimization failed: Too many logo scalings")
 
+class TestLoadCardImagesCaching(unittest.TestCase):
+    """Tests for load_card_images caching behavior."""
+
+    def setUp(self):
+        """Reset module-level cache state before each test."""
+        uno_ui._RAW_CARD_IMAGES = None
+        uno_ui._CACHED_SCALED_IMAGES = None
+        uno_ui._LAST_CARD_DIMENSIONS = None
+
+    @patch('pyuno.ui.uno_ui.pygame')
+    def test_image_load_called_once_per_card(self, mock_pygame_module):
+        """pygame.image.load is called once per card on first call, not on subsequent calls."""
+        fake_surface = MagicMock()
+        fake_surface.convert_alpha.return_value = fake_surface
+        mock_pygame_module.image.load.return_value = fake_surface
+        mock_pygame_module.transform.scale.return_value = fake_surface
+        mock_pygame_module.error = pygame.error
+
+        # First call - should load all images
+        uno_ui.load_card_images(50, 70)
+        first_call_count = mock_pygame_module.image.load.call_count
+        self.assertGreater(first_call_count, 0, "Expected at least one image.load call on first invocation")
+
+        # Second call with same dimensions - should NOT load images again
+        uno_ui.load_card_images(50, 70)
+        self.assertEqual(
+            mock_pygame_module.image.load.call_count,
+            first_call_count,
+            "pygame.image.load should not be called again for same dimensions"
+        )
+
+    @patch('pyuno.ui.uno_ui.pygame')
+    def test_transform_scale_only_on_dimension_change(self, mock_pygame_module):
+        """pygame.transform.scale is called only when card dimensions change."""
+        fake_surface = MagicMock()
+        fake_surface.convert_alpha.return_value = fake_surface
+        mock_pygame_module.image.load.return_value = fake_surface
+        mock_pygame_module.transform.scale.return_value = fake_surface
+        mock_pygame_module.error = pygame.error
+
+        # First call
+        uno_ui.load_card_images(50, 70)
+        scale_count_after_first = mock_pygame_module.transform.scale.call_count
+        self.assertGreater(scale_count_after_first, 0, "Expected scale calls on first invocation")
+
+        # Second call with same dimensions - no additional scale calls
+        uno_ui.load_card_images(50, 70)
+        self.assertEqual(
+            mock_pygame_module.transform.scale.call_count,
+            scale_count_after_first,
+            "transform.scale should not be called again when dimensions are unchanged"
+        )
+
+        # Third call with different dimensions - should rescale
+        uno_ui.load_card_images(60, 84)
+        self.assertGreater(
+            mock_pygame_module.transform.scale.call_count,
+            scale_count_after_first,
+            "transform.scale should be called again when dimensions change"
+        )
+
+        # Fourth call with same new dimensions - no additional scale calls
+        scale_count_after_resize = mock_pygame_module.transform.scale.call_count
+        uno_ui.load_card_images(60, 84)
+        self.assertEqual(
+            mock_pygame_module.transform.scale.call_count,
+            scale_count_after_resize,
+            "transform.scale should not be called again when dimensions are unchanged after resize"
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
