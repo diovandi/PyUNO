@@ -12,9 +12,11 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("PyUNO by Group 19")
 
-# Get the path to assets directory relative to the project root
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-logo_path = os.path.join(project_root, 'assets', 'uno_logo.png')
+# Constants for paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ASSETS_DIR = os.path.join(PROJECT_ROOT, 'assets')
+
+logo_path = os.path.join(ASSETS_DIR, 'uno_logo.png')
 uno_logo_original = pygame.image.load(logo_path).convert_alpha()
 pygame.display.set_icon(uno_logo_original)
 
@@ -28,10 +30,8 @@ def get_font_path(font_filename):
     """
     Get the absolute path to a font file in the assets directory
     """
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     # Join with assets directory and filename
-    return os.path.join(project_root, 'assets', font_filename)
+    return os.path.join(ASSETS_DIR, font_filename)
 
 def load_font_safe(font_path, size, fallback_font=None):
     """
@@ -151,9 +151,7 @@ def start_menu():
 
 def load_card_images(card_width, card_height):
     card_images = {}
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    card_path = os.path.join(project_root, 'assets')
+    card_path = ASSETS_DIR
 
     COLORS = ["red", "yellow", "green", "blue"]
     VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
