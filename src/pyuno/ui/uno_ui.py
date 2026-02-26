@@ -233,6 +233,10 @@ def main_game_ui(game):
     uno_qte_duration = 3.0  # 3 seconds to call UNO
     uno_qte_button_rect = None
 
+    # Cached surfaces
+    cached_status_bg_surface = None
+    cached_status_bg_size = None
+
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
 
@@ -386,9 +390,13 @@ def main_game_ui(game):
         text_surface = status_font.render(status_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.35))
         bg_rect = text_rect.copy().inflate(20, 10)
-        bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 150))
-        screen.blit(bg_surface, bg_rect)
+
+        if cached_status_bg_surface is None or bg_rect.size != cached_status_bg_size:
+            cached_status_bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+            cached_status_bg_surface.fill((0, 0, 0, 150))
+            cached_status_bg_size = bg_rect.size
+
+        screen.blit(cached_status_bg_surface, bg_rect)
         screen.blit(text_surface, text_rect)
 
         if draw_message:
