@@ -89,7 +89,7 @@ def create_final_executable():
         print(f"PyInstaller version: {PyInstaller.__version__}")
     except ImportError:
         print("Installing PyInstaller...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller==6.11.1"])
     
     # Ensure platform-appropriate icon exists
     try:
