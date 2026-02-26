@@ -128,8 +128,9 @@ class TestDeck(unittest.TestCase):
         while deck.cards:
             deck.draw_card()
         
-        # Add one card to discard pile
+        # Add cards to discard pile (need at least 2 for reshuffle to work)
         deck.play_card(Card("red", "5"))
+        deck.play_card(Card("blue", "8"))
         
         # Drawing should reshuffle
         card = deck.draw_card()
