@@ -56,7 +56,7 @@ def ensure_icon_exists(platform_info):
                 print("✓ ICO file created successfully")
             except ImportError:
                 print("Installing Pillow for icon conversion...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
                 from PIL import Image
                 img = Image.open(png_path)
                 img.save(icon_path, format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64)])
@@ -89,7 +89,7 @@ def create_final_executable():
         print(f"PyInstaller version: {PyInstaller.__version__}")
     except ImportError:
         print("Installing PyInstaller...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
     
     # Ensure platform-appropriate icon exists
     try:
