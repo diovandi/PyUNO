@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import time
+from functools import lru_cache
 from ..core.uno_classes import Game, Player, Card
 from ..config.font_config import get_font_config
 
@@ -13,8 +14,8 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
 pygame.display.set_caption("PyUNO by Group 19")
 
 # Get the path to assets directory relative to the project root
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-logo_path = os.path.join(project_root, 'assets', 'uno_logo.png')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+logo_path = os.path.join(PROJECT_ROOT, 'assets', 'uno_logo.png')
 uno_logo_original = pygame.image.load(logo_path).convert_alpha()
 pygame.display.set_icon(uno_logo_original)
 
@@ -28,10 +29,8 @@ def get_font_path(font_filename):
     """
     Get the absolute path to a font file in the assets directory
     """
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     # Join with assets directory and filename
-    return os.path.join(project_root, 'assets', font_filename)
+    return os.path.join(PROJECT_ROOT, 'assets', font_filename)
 
 def load_font_safe(font_path, size, fallback_font=None):
     """
@@ -76,6 +75,7 @@ def load_font_safe(font_path, size, fallback_font=None):
     # Last resort: use default pygame font
     return pygame.font.Font(None, size)
 
+@lru_cache(maxsize=32)
 def load_font_by_type(font_type, size):
     """
     Load a font using the font configuration system
@@ -98,29 +98,45 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
+    # Initialize state for resizing logic
+    last_width = 0
+    last_height = 0
+
+    # Pre-declare variables that depend on size
+    uno_logo_scaled = None
+    logo_rect = None
+    credit_font = None
+    start_button = None
+    start_font = None
+
     while True:
         current_width = screen.get_width()
         current_height = screen.get_height()
 
+        # Check if resize happened or if it's the first frame
+        if current_width != last_width or current_height != last_height:
+            last_width = current_width
+            last_height = current_height
+
+            logo_height = int(current_height * 0.5)
+            logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
+            uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
+            logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
+
+            credit_font_size = int(current_height * 0.04)
+            credit_font = load_font_by_type('credit', credit_font_size)
+
+            button_width = int(current_width * 0.25)
+            button_height = int(current_height * 0.12)
+            button_x = current_width / 2 - button_width / 2
+            button_y = current_height * 0.7 - button_height / 2
+            start_button = pygame.Rect(button_x, button_y, button_width, button_height)
+
+            start_font_size = int(button_height * 0.6)
+            start_font = load_font_by_type('start_button', start_font_size)
+
         screen.fill(BLACK)
-
-        logo_height = int(current_height * 0.5)
-        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-        uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-        logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
         screen.blit(uno_logo_scaled, logo_rect)
-        
-        credit_font_size = int(current_height * 0.04)
-        credit_font = load_font_by_type('credit', credit_font_size)
-
-        button_width = int(current_width * 0.25)
-        button_height = int(current_height * 0.12)
-        button_x = current_width / 2 - button_width / 2
-        button_y = current_height * 0.7 - button_height / 2
-        start_button = pygame.Rect(button_x, button_y, button_width, button_height)
-        
-        start_font_size = int(button_height * 0.6)
-        start_font = load_font_by_type('start_button', start_font_size)
 
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
 
@@ -149,11 +165,10 @@ def start_menu():
 
         pygame.display.update()
 
+@lru_cache(maxsize=1)
 def load_card_images(card_width, card_height):
     card_images = {}
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    card_path = os.path.join(project_root, 'assets')
+    card_path = os.path.join(PROJECT_ROOT, 'assets')
 
     COLORS = ["red", "yellow", "green", "blue"]
     VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
@@ -232,6 +247,10 @@ def main_game_ui(game):
     uno_qte_start_time = 0
     uno_qte_duration = 3.0  # 3 seconds to call UNO
     uno_qte_button_rect = None
+
+    # Cached surfaces
+    cached_status_bg_surface = None
+    cached_status_bg_size = None
 
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
@@ -386,9 +405,13 @@ def main_game_ui(game):
         text_surface = status_font.render(status_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.35))
         bg_rect = text_rect.copy().inflate(20, 10)
-        bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 150))
-        screen.blit(bg_surface, bg_rect)
+
+        if cached_status_bg_surface is None or bg_rect.size != cached_status_bg_size:
+            cached_status_bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+            cached_status_bg_surface.fill((0, 0, 0, 150))
+            cached_status_bg_size = bg_rect.size
+
+        screen.blit(cached_status_bg_surface, bg_rect)
         screen.blit(text_surface, text_rect)
 
         if draw_message:
