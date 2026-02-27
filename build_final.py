@@ -56,7 +56,7 @@ def ensure_icon_exists(platform_info):
                 print("✓ ICO file created successfully")
             except ImportError:
                 print("Installing Pillow for icon conversion...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow==11.0.0"])
                 from PIL import Image
                 img = Image.open(png_path)
                 img.save(icon_path, format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64)])
