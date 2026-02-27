@@ -166,7 +166,6 @@ def load_card_images(card_width, card_height):
     """
     Load and scale card images, caching the originals from disk.
     """
-    global _ORIGINAL_CARD_IMAGES_CACHE
     card_images = {}
     # Get the project root directory
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -192,7 +191,8 @@ def load_card_images(card_width, card_height):
             except pygame.error:
                 continue
 
-        card_images[card_name] = pygame.transform.scale(_ORIGINAL_CARD_IMAGES_CACHE[card_name], (card_width, card_height))
+        if card_name in _ORIGINAL_CARD_IMAGES_CACHE:
+            card_images[card_name] = pygame.transform.scale(_ORIGINAL_CARD_IMAGES_CACHE[card_name], (card_width, card_height))
 
     return card_images
 
