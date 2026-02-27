@@ -187,12 +187,10 @@ def start_menu():
 def load_card_images(card_width, card_height):
     global _RAW_CARD_IMAGES, _CACHED_SCALED_IMAGES, _LAST_CARD_DIMENSIONS
 
-    # Initialize raw images if needed
+    # Initialize raw images once
     if _RAW_CARD_IMAGES is None:
         _RAW_CARD_IMAGES = {}
-        # Get the project root directory
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        card_path = os.path.join(project_root, 'assets')
+        card_path = os.path.join(PROJECT_ROOT, 'assets')
 
         COLORS = ["red", "yellow", "green", "blue"]
         VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
@@ -209,16 +207,6 @@ def load_card_images(card_width, card_height):
                     pass
 
         for card_name in SPECIAL_CARDS:
-    card_images = {}
-    card_path = os.path.join(PROJECT_ROOT, 'assets')
-
-    COLORS = ["red", "yellow", "green", "blue"]
-    VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
-    SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
-
-    for color in COLORS:
-        for value in VALUES:
-            card_name = f"{color}_{value}"
             file_path = os.path.join(card_path, f"{card_name}.png")
             try:
                 image = pygame.image.load(file_path).convert_alpha()
