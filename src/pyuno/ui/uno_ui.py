@@ -33,6 +33,8 @@ BLACK = (0, 0, 0)
 RED = (200, 0, 0)
 BRIGHT_RED = (255, 0, 0)
 
+_LOGO_IMAGE_CACHE = {}
+
 def get_font_path(font_filename):
     """
     Get the absolute path to a font file in the assets directory
@@ -98,7 +100,7 @@ def load_font_safe(font_path, size, fallback_font=None):
     _FONT_CACHE[cache_key] = font_obj
     return font_obj
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=None)
 def load_font_by_type(font_type, size):
     """
     Load a font using the font configuration system
@@ -121,43 +123,38 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
-    # Initialize state for resizing logic
-    last_width = 0
-    last_height = 0
+    # Initial setup
+    current_width = screen.get_width()
+    current_height = screen.get_height()
 
-    # Pre-declare variables that depend on size
-    uno_logo_scaled = None
-    logo_rect = None
-    credit_font = None
-    start_button = None
-    start_font = None
+    def update_ui_elements(width, height):
+        logo_height = int(height * 0.5)
+        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
+        cache_key = (logo_width, logo_height)
+        if cache_key not in _LOGO_IMAGE_CACHE:
+            if len(_LOGO_IMAGE_CACHE) >= 16:
+                del _LOGO_IMAGE_CACHE[next(iter(_LOGO_IMAGE_CACHE))]
+            _LOGO_IMAGE_CACHE[cache_key] = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
+        logo_scaled = _LOGO_IMAGE_CACHE[cache_key]
+        logo_rect = logo_scaled.get_rect(center=(width / 2, height * 0.35))
+
+        credit_font_size = int(height * 0.04)
+        credit_font = load_font_by_type('credit', credit_font_size)
+
+        button_width = int(width * 0.25)
+        button_height = int(height * 0.12)
+        btn_x = width / 2 - button_width / 2
+        btn_y = height * 0.7 - button_height / 2
+        start_button = pygame.Rect(btn_x, btn_y, button_width, button_height)
+
+        start_font_size = int(button_height * 0.6)
+        start_font = load_font_by_type('start_button', start_font_size)
+        
+        return logo_scaled, logo_rect, credit_font, start_button, start_font
+
+    uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
 
     while True:
-        current_width = screen.get_width()
-        current_height = screen.get_height()
-
-        # Check if resize happened or if it's the first frame
-        if current_width != last_width or current_height != last_height:
-            last_width = current_width
-            last_height = current_height
-
-            logo_height = int(current_height * 0.5)
-            logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-            uno_logo_scaled = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-            logo_rect = uno_logo_scaled.get_rect(center=(current_width / 2, current_height * 0.35))
-
-            credit_font_size = int(current_height * 0.04)
-            credit_font = load_font_by_type('credit', credit_font_size)
-
-            button_width = int(current_width * 0.25)
-            button_height = int(current_height * 0.12)
-            button_x = current_width / 2 - button_width / 2
-            button_y = current_height * 0.7 - button_height / 2
-            start_button = pygame.Rect(button_x, button_y, button_width, button_height)
-
-            start_font_size = int(button_height * 0.6)
-            start_font = load_font_by_type('start_button', start_font_size)
-
         screen.fill(BLACK)
         screen.blit(uno_logo_scaled, logo_rect)
 
@@ -177,6 +174,8 @@ def start_menu():
             
             if event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                current_width, current_height = event.w, event.h
+                uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and start_button.collidepoint((mouse_x, mouse_y)):
