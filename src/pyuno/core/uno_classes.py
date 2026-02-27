@@ -1,4 +1,5 @@
 import random
+import secrets
 from typing import List, Optional
 import time
 
@@ -493,13 +494,13 @@ class Game:
             for card in playable_cards:
                 if card.value in ["drawtwo", "drawfour"]:
                     return card
-            return random.choice(playable_cards)
+            return secrets.choice(playable_cards)
         
         # Normal strategy
         for card in playable_cards:
             if card.value in ["drawfour", "drawtwo", "skip", "reverse"]:
                 return card
-        return random.choice(playable_cards)
+        return secrets.choice(playable_cards)
 
     def _choose_best_color(self, player: Player) -> str:
         """Choose the best color based on the cards in hand."""
