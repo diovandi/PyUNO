@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import time
+from functools import lru_cache
 from ..core.uno_classes import Game, Player, Card
 from ..config.font_config import get_font_config
 
@@ -23,6 +24,8 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (200, 0, 0)
 BRIGHT_RED = (255, 0, 0)
+
+_LOGO_IMAGE_CACHE = {}
 
 def get_font_path(font_filename):
     """
@@ -76,6 +79,7 @@ def load_font_safe(font_path, size, fallback_font=None):
     # Last resort: use default pygame font
     return pygame.font.Font(None, size)
 
+@lru_cache(maxsize=None)
 def load_font_by_type(font_type, size):
     """
     Load a font using the font configuration system
@@ -103,37 +107,33 @@ def start_menu():
     current_height = screen.get_height()
 
     def update_ui_elements(width, height):
-        logo_h = int(height * 0.5)
-        logo_w = int(uno_logo_original.get_width() * (logo_h / uno_logo_original.get_height()))
-        logo_scaled = pygame.transform.scale(uno_logo_original, (logo_w, logo_h))
-        logo_r = logo_scaled.get_rect(center=(width / 2, height * 0.35))
+        logo_height = int(height * 0.5)
+        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
+        cache_key = (logo_width, logo_height)
+        if cache_key not in _LOGO_IMAGE_CACHE:
+            if len(_LOGO_IMAGE_CACHE) >= 16:
+                del _LOGO_IMAGE_CACHE[next(iter(_LOGO_IMAGE_CACHE))]
+            _LOGO_IMAGE_CACHE[cache_key] = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
+        logo_scaled = _LOGO_IMAGE_CACHE[cache_key]
+        logo_rect = logo_scaled.get_rect(center=(width / 2, height * 0.35))
 
-        c_font_size = int(height * 0.04)
-        c_font = load_font_by_type('credit', c_font_size)
+        credit_font_size = int(height * 0.04)
+        credit_font = load_font_by_type('credit', credit_font_size)
 
-        btn_w = int(width * 0.25)
-        btn_h = int(height * 0.12)
-        btn_x = width / 2 - btn_w / 2
-        btn_y = height * 0.7 - btn_h / 2
-        start_btn = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+        button_width = int(width * 0.25)
+        button_height = int(height * 0.12)
+        btn_x = width / 2 - button_width / 2
+        btn_y = height * 0.7 - button_height / 2
+        start_button = pygame.Rect(btn_x, btn_y, button_width, button_height)
 
-        s_font_size = int(btn_h * 0.6)
-        s_font = load_font_by_type('start_button', s_font_size)
+        start_font_size = int(button_height * 0.6)
+        start_font = load_font_by_type('start_button', start_font_size)
         
-        return logo_scaled, logo_r, c_font, start_btn, s_font
+        return logo_scaled, logo_rect, credit_font, start_button, start_font
 
     uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
 
     while True:
-        # Check for resize
-        new_width = screen.get_width()
-        new_height = screen.get_height()
-        
-        if new_width != current_width or new_height != current_height:
-            current_width = new_width
-            current_height = new_height
-            uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
-
         screen.fill(BLACK)
         screen.blit(uno_logo_scaled, logo_rect)
 
@@ -153,6 +153,8 @@ def start_menu():
             
             if event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                current_width, current_height = event.w, event.h
+                uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and start_button.collidepoint((mouse_x, mouse_y)):
