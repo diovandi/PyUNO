@@ -100,7 +100,8 @@ def load_font_safe(font_path, size, fallback_font=None):
     _FONT_CACHE[cache_key] = font_obj
     return font_obj
 
-@lru_cache(maxsize=None)
+_FONT_CACHE = {}
+
 def load_font_by_type(font_type, size):
     """
     Load a font using the font configuration system
@@ -114,6 +115,15 @@ def load_font_by_type(font_type, size):
     font_path = get_font_path(config['file'])
     return load_font_safe(font_path, size, config['fallback'])
 
+def get_font(font_type, size):
+    """
+    Get a font from the cache, loading it if necessary
+    """
+    key = (font_type, size)
+    if key not in _FONT_CACHE:
+        _FONT_CACHE[key] = load_font_by_type(font_type, size)
+    return _FONT_CACHE[key]
+
 def draw_text(text, font, color, surface, x, y):
     textobj = font.render(text, 1, color)
     textrect = textobj.get_rect()
@@ -123,44 +133,28 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
-    # Cache variables
-    last_width, last_height = 0, 0
-    cached_assets = {}
+    def load_resources(width, height):
+        logo_h = int(height * 0.5)
+        logo_w = int(uno_logo_original.get_width() * (logo_h / uno_logo_original.get_height()))
+        logo_scaled = pygame.transform.scale(uno_logo_original, (logo_w, logo_h))
+        logo_r = logo_scaled.get_rect(center=(width / 2, height * 0.35))
+
+        c_font = get_font('credit', int(height * 0.04))
+
+        b_width = int(width * 0.25)
+        b_height = int(height * 0.12)
+        b_rect = pygame.Rect(width / 2 - b_width / 2, height * 0.7 - b_height / 2, b_width, b_height)
+
+        s_font = get_font('start_button', int(b_height * 0.6))
+        return logo_scaled, logo_r, c_font, b_rect, s_font
+
+    current_width, current_height = screen.get_width(), screen.get_height()
+    uno_logo_scaled, logo_rect, credit_font, start_button, start_font = load_resources(current_width, current_height)
 
     while True:
-        current_width = screen.get_width()
-        current_height = screen.get_height()
-
-        if current_width != last_width or current_height != last_height:
-            logo_height = int(current_height * 0.5)
-            logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-            cached_assets['uno_logo_scaled'] = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-            cached_assets['logo_rect'] = cached_assets['uno_logo_scaled'].get_rect(center=(current_width / 2, current_height * 0.35))
-
-            credit_font_size = int(current_height * 0.04)
-            cached_assets['credit_font'] = load_font_by_type('credit', credit_font_size)
-
-            button_width = int(current_width * 0.25)
-            button_height = int(current_height * 0.12)
-            button_x = current_width / 2 - button_width / 2
-            button_y = current_height * 0.7 - button_height / 2
-            cached_assets['start_button'] = pygame.Rect(button_x, button_y, button_width, button_height)
-
-            start_font_size = int(button_height * 0.6)
-            cached_assets['start_font'] = load_font_by_type('start_button', start_font_size)
-
-            last_width, last_height = current_width, current_height
-
-        uno_logo_scaled = cached_assets['uno_logo_scaled']
-        logo_rect = cached_assets['logo_rect']
-        credit_font = cached_assets['credit_font']
-        start_button = cached_assets['start_button']
-        start_font = cached_assets['start_font']
-
         screen.fill(BLACK)
-
         screen.blit(uno_logo_scaled, logo_rect)
-
+        
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -178,7 +172,7 @@ def start_menu():
             if event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 current_width, current_height = event.w, event.h
-                uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
+                uno_logo_scaled, logo_rect, credit_font, start_button, start_font = load_resources(current_width, current_height)
            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and start_button.collidepoint((mouse_x, mouse_y)):
@@ -190,43 +184,39 @@ def start_menu():
 
         pygame.display.update()
 
-@lru_cache(maxsize=1)
+_ORIGINAL_CARD_IMAGES_CACHE = {}
+
 def load_card_images(card_width, card_height):
-    global _RAW_CARD_IMAGES, _CACHED_SCALED_IMAGES, _LAST_CARD_DIMENSIONS
+    """
+    Load and scale card images, caching the originals from disk.
+    """
+    card_images = {}
+    # Get the project root directory
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    card_path = os.path.join(project_root, 'assets')
 
-    # Initialize raw images once
-    if _RAW_CARD_IMAGES is None:
-        _RAW_CARD_IMAGES = {}
-        card_path = os.path.join(PROJECT_ROOT, 'assets')
+    COLORS = ["red", "yellow", "green", "blue"]
+    VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
+    SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
 
-        COLORS = ["red", "yellow", "green", "blue"]
-        VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
-        SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
+    # Collect all card names to load
+    all_card_names = []
+    for color in COLORS:
+        for value in VALUES:
+            all_card_names.append(f"{color}_{value}")
+    all_card_names.extend(SPECIAL_CARDS)
+    all_card_names.append("card_back")
 
-        for color in COLORS:
-            for value in VALUES:
-                card_name = f"{color}_{value}"
-                file_path = os.path.join(card_path, f"{card_name}.png")
-                try:
-                    image = pygame.image.load(file_path).convert_alpha()
-                    _RAW_CARD_IMAGES[card_name] = image
-                except pygame.error:
-                    pass
-
-        for card_name in SPECIAL_CARDS:
+    for card_name in all_card_names:
+        if card_name not in _ORIGINAL_CARD_IMAGES_CACHE:
             file_path = os.path.join(card_path, f"{card_name}.png")
             try:
-                image = pygame.image.load(file_path).convert_alpha()
-                _RAW_CARD_IMAGES[card_name] = image
+                _ORIGINAL_CARD_IMAGES_CACHE[card_name] = pygame.image.load(file_path).convert_alpha()
             except pygame.error:
-                pass
+                continue
 
-        file_path = os.path.join(card_path, "card_back.png")
-        try:
-            image = pygame.image.load(file_path).convert_alpha()
-            _RAW_CARD_IMAGES["card_back"] = image
-        except pygame.error:
-            pass
+        if card_name in _ORIGINAL_CARD_IMAGES_CACHE:
+            card_images[card_name] = pygame.transform.scale(_ORIGINAL_CARD_IMAGES_CACHE[card_name], (card_width, card_height))
 
     # Check if we can use cached scaled images
     if _CACHED_SCALED_IMAGES is not None and _LAST_CARD_DIMENSIONS == (card_width, card_height):
@@ -252,7 +242,7 @@ def draw_color_selection_menu(screen, current_width, current_height, button_font
     overlay.fill((0, 0, 0, 128))
     screen.blit(overlay, (0, 0))
     
-    title_font = load_font_by_type('title', int(current_height * 0.05))
+    title_font = get_font('title', int(current_height * 0.05))
     draw_text("Choose a Color", title_font, WHITE, screen, current_width/2, current_height * 0.3)
     
     button_size = int(current_width * 0.1)
@@ -273,6 +263,20 @@ def draw_color_selection_menu(screen, current_width, current_height, button_font
 def main_game_ui(game):
     global screen
 
+    def load_resources(width, height):
+        c_width = int(width * 0.06)
+        c_height = int(c_width * 1.45)
+        images = load_card_images(c_width, c_height)
+
+        s_font = get_font('status', int(height * 0.03))
+        b_font = get_font('button', int(height * 0.035))
+        u_font = get_font('button', int(height * 0.04))
+        w_font = get_font('winner', int(height * 0.05))
+        return c_width, c_height, images, s_font, b_font, u_font, w_font
+
+    current_width, current_height = screen.get_width(), screen.get_height()
+    card_width, card_height, CARD_IMAGES, status_font, button_font, uno_button_font, winner_font = load_resources(current_width, current_height)
+
     running = True
     last_turn_time = 0
     turn_delay = 2.0
@@ -292,31 +296,6 @@ def main_game_ui(game):
     cached_assets = {}
 
     while running:
-        current_width, current_height = screen.get_width(), screen.get_height()
-
-        if current_width != last_width or current_height != last_height:
-            card_width = int(current_width * 0.06)
-            card_height = int(card_width * 1.45)
-            cached_assets['card_width'] = card_width
-            cached_assets['card_height'] = card_height
-            cached_assets['CARD_IMAGES'] = load_card_images(card_width, card_height)
-
-            cached_assets['status_font'] = load_font_by_type('status', int(current_height * 0.03))
-            cached_assets['button_font'] = load_font_by_type('button', int(current_height * 0.035))
-            uno_font_size = int(current_height * 0.04)
-            cached_assets['uno_button_font'] = load_font_by_type('button', uno_font_size)
-            cached_assets['winner_font'] = load_font_by_type('winner', int(current_height * 0.05))
-
-            last_width, last_height = current_width, current_height
-
-        card_width = cached_assets['card_width']
-        card_height = cached_assets['card_height']
-        CARD_IMAGES = cached_assets['CARD_IMAGES']
-        status_font = cached_assets['status_font']
-        button_font = cached_assets['button_font']
-        uno_button_font = cached_assets['uno_button_font']
-        winner_font = cached_assets['winner_font']
-
         mouse_pos = pygame.mouse.get_pos()
         current_time = time.time()
 
@@ -363,6 +342,8 @@ def main_game_ui(game):
                 running = False
             if event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                current_width, current_height = event.w, event.h
+                card_width, card_height, CARD_IMAGES, status_font, button_font, uno_button_font, winner_font = load_resources(current_width, current_height)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
