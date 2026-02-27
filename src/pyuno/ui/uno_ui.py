@@ -13,11 +13,19 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("PyUNO by Group 19")
 
-# Get the path to assets directory relative to the project root
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-logo_path = os.path.join(project_root, 'assets', 'uno_logo.png')
+# Constants for paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ASSETS_DIR = os.path.join(PROJECT_ROOT, 'assets')
+
+logo_path = os.path.join(ASSETS_DIR, 'uno_logo.png')
 uno_logo_original = pygame.image.load(logo_path).convert_alpha()
 pygame.display.set_icon(uno_logo_original)
+
+# Caching globals
+_RAW_CARD_IMAGES = None
+_CACHED_SCALED_IMAGES = None
+_LAST_CARD_DIMENSIONS = None
+_FONT_CACHE = {}
 
 GREEN = (0, 100, 0)
 WHITE = (255, 255, 255)
@@ -31,10 +39,8 @@ def get_font_path(font_filename):
     """
     Get the absolute path to a font file in the assets directory
     """
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     # Join with assets directory and filename
-    return os.path.join(project_root, 'assets', font_filename)
+    return os.path.join(ASSETS_DIR, font_filename)
 
 def load_font_safe(font_path, size, fallback_font=None):
     """
@@ -46,38 +52,53 @@ def load_font_safe(font_path, size, fallback_font=None):
     Returns:
         pygame.font.Font object
     """
+    global _FONT_CACHE
+
     # If it's a relative path starting with 'fonts/', convert to absolute path
     if font_path.startswith('fonts/'):
         font_filename = font_path.replace('fonts/', '')
         font_path = get_font_path(font_filename)
     
+    cache_key = (font_path, size, fallback_font)
+    if cache_key in _FONT_CACHE:
+        return _FONT_CACHE[cache_key]
+
+    font_obj = None
+
     try:
         # Try to load the custom font
         if os.path.exists(font_path):
-            return pygame.font.Font(font_path, size)
+            font_obj = pygame.font.Font(font_path, size)
         else:
             print(f"Warning: Font file '{font_path}' not found. Using fallback.")
     except pygame.error as e:
         print(f"Warning: Could not load font '{font_path}': {e}. Using fallback.")
     
-    # Fallback options
-    try:
-        if fallback_font:
-            # Try specific fallback font
-            return pygame.font.SysFont(fallback_font, size)
-    except:
-        pass
-    
-    # Try common system fonts as fallbacks
-    fallback_fonts = ['arial', 'helvetica', 'calibri', 'segoeui', 'trebuchetms']
-    for font_name in fallback_fonts:
+    if font_obj is None:
+        # Fallback options
         try:
-            return pygame.font.SysFont(font_name, size)
+            if fallback_font:
+                # Try specific fallback font
+                font_obj = pygame.font.SysFont(fallback_font, size)
         except:
-            continue
+            pass
+
+    if font_obj is None:
+        # Try common system fonts as fallbacks
+        fallback_fonts = ['arial', 'helvetica', 'calibri', 'segoeui', 'trebuchetms']
+        for font_name in fallback_fonts:
+            try:
+                font_obj = pygame.font.SysFont(font_name, size)
+                break
+            except:
+                continue
     
     # Last resort: use default pygame font
-    return pygame.font.Font(None, size)
+    if font_obj is None:
+        font_obj = pygame.font.Font(None, size)
+
+    _FONT_CACHE[cache_key] = font_obj
+    return font_obj
 
 @lru_cache(maxsize=None)
 def load_font_by_type(font_type, size):
@@ -166,42 +187,55 @@ def start_menu():
 
         pygame.display.update()
 
+@lru_cache(maxsize=1)
 def load_card_images(card_width, card_height):
-    card_images = {}
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    card_path = os.path.join(project_root, 'assets')
+    global _RAW_CARD_IMAGES, _CACHED_SCALED_IMAGES, _LAST_CARD_DIMENSIONS
 
-    COLORS = ["red", "yellow", "green", "blue"]
-    VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
-    SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
+    # Initialize raw images once
+    if _RAW_CARD_IMAGES is None:
+        _RAW_CARD_IMAGES = {}
+        card_path = os.path.join(PROJECT_ROOT, 'assets')
 
-    for color in COLORS:
-        for value in VALUES:
-            card_name = f"{color}_{value}"
+        COLORS = ["red", "yellow", "green", "blue"]
+        VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo"]
+        SPECIAL_CARDS = ["wild_standard", "wild_drawfour"]
+
+        for color in COLORS:
+            for value in VALUES:
+                card_name = f"{color}_{value}"
+                file_path = os.path.join(card_path, f"{card_name}.png")
+                try:
+                    image = pygame.image.load(file_path).convert_alpha()
+                    _RAW_CARD_IMAGES[card_name] = image
+                except pygame.error:
+                    pass
+
+        for card_name in SPECIAL_CARDS:
             file_path = os.path.join(card_path, f"{card_name}.png")
             try:
                 image = pygame.image.load(file_path).convert_alpha()
-                card_images[card_name] = pygame.transform.scale(image, (card_width, card_height))
+                _RAW_CARD_IMAGES[card_name] = image
             except pygame.error:
                 pass
 
-    for card_name in SPECIAL_CARDS:
-        file_path = os.path.join(card_path, f"{card_name}.png")
+        file_path = os.path.join(card_path, "card_back.png")
         try:
             image = pygame.image.load(file_path).convert_alpha()
-            card_images[card_name] = pygame.transform.scale(image, (card_width, card_height))
+            _RAW_CARD_IMAGES["card_back"] = image
         except pygame.error:
             pass
-            
-    file_path = os.path.join(card_path, "card_back.png")
-    try:
-        image = pygame.image.load(file_path).convert_alpha()
-        card_images["card_back"] = pygame.transform.scale(image, (card_width, card_height))
-    except pygame.error:
-        pass
 
-    return card_images
+    # Check if we can use cached scaled images
+    if _CACHED_SCALED_IMAGES is not None and _LAST_CARD_DIMENSIONS == (card_width, card_height):
+        return _CACHED_SCALED_IMAGES
+
+    # Create new scaled images
+    _CACHED_SCALED_IMAGES = {}
+    for name, image in _RAW_CARD_IMAGES.items():
+        _CACHED_SCALED_IMAGES[name] = pygame.transform.scale(image, (card_width, card_height))
+
+    _LAST_CARD_DIMENSIONS = (card_width, card_height)
+    return _CACHED_SCALED_IMAGES
 
 def draw_color_selection_menu(screen, current_width, current_height, button_font):
     COLORS = {
@@ -249,6 +283,10 @@ def main_game_ui(game):
     uno_qte_start_time = 0
     uno_qte_duration = 3.0  # 3 seconds to call UNO
     uno_qte_button_rect = None
+
+    # Cached surfaces
+    cached_status_bg_surface = None
+    cached_status_bg_size = None
 
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
@@ -403,9 +441,13 @@ def main_game_ui(game):
         text_surface = status_font.render(status_text, True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=(current_width / 2, current_height * 0.35))
         bg_rect = text_rect.copy().inflate(20, 10)
-        bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 150))
-        screen.blit(bg_surface, bg_rect)
+
+        if cached_status_bg_surface is None or bg_rect.size != cached_status_bg_size:
+            cached_status_bg_surface = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+            cached_status_bg_surface.fill((0, 0, 0, 150))
+            cached_status_bg_size = bg_rect.size
+
+        screen.blit(cached_status_bg_surface, bg_rect)
         screen.blit(text_surface, text_rect)
 
         if draw_message:
