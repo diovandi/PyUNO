@@ -3,6 +3,8 @@ import secrets
 from typing import List, Optional
 import time
 
+_RNG = random.SystemRandom()
+
 class Card:
     VALID_COLORS = ["red", "yellow", "green", "blue", "wild"]
     VALID_VALUES = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "drawtwo", "standard", "drawfour"]
@@ -71,7 +73,7 @@ class Deck:
             self.cards.append(Card("wild", "drawfour"))
 
     def shuffle(self):
-        random.shuffle(self.cards)
+        _RNG.shuffle(self.cards)
 
     def draw_card(self) -> Optional[Card]:
         if not self.cards:
@@ -494,13 +496,13 @@ class Game:
             for card in playable_cards:
                 if card.value in ["drawtwo", "drawfour"]:
                     return card
-            return secrets.choice(playable_cards)
+            return _RNG.choice(playable_cards)
         
         # Normal strategy
         for card in playable_cards:
             if card.value in ["drawfour", "drawtwo", "skip", "reverse"]:
                 return card
-        return secrets.choice(playable_cards)
+        return _RNG.choice(playable_cards)
 
     def _choose_best_color(self, player: Player) -> str:
         """Choose the best color based on the cards in hand."""
