@@ -123,39 +123,42 @@ def draw_text(text, font, color, surface, x, y):
 def start_menu():
     global screen
 
-    # Initial setup
-    current_width = screen.get_width()
-    current_height = screen.get_height()
-
-    def update_ui_elements(width, height):
-        logo_height = int(height * 0.5)
-        logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
-        cache_key = (logo_width, logo_height)
-        if cache_key not in _LOGO_IMAGE_CACHE:
-            if len(_LOGO_IMAGE_CACHE) >= 16:
-                del _LOGO_IMAGE_CACHE[next(iter(_LOGO_IMAGE_CACHE))]
-            _LOGO_IMAGE_CACHE[cache_key] = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
-        logo_scaled = _LOGO_IMAGE_CACHE[cache_key]
-        logo_rect = logo_scaled.get_rect(center=(width / 2, height * 0.35))
-
-        credit_font_size = int(height * 0.04)
-        credit_font = load_font_by_type('credit', credit_font_size)
-
-        button_width = int(width * 0.25)
-        button_height = int(height * 0.12)
-        btn_x = width / 2 - button_width / 2
-        btn_y = height * 0.7 - button_height / 2
-        start_button = pygame.Rect(btn_x, btn_y, button_width, button_height)
-
-        start_font_size = int(button_height * 0.6)
-        start_font = load_font_by_type('start_button', start_font_size)
-        
-        return logo_scaled, logo_rect, credit_font, start_button, start_font
-
-    uno_logo_scaled, logo_rect, credit_font, start_button, start_font = update_ui_elements(current_width, current_height)
+    # Cache variables
+    last_width, last_height = 0, 0
+    cached_assets = {}
 
     while True:
+        current_width = screen.get_width()
+        current_height = screen.get_height()
+
+        if current_width != last_width or current_height != last_height:
+            logo_height = int(current_height * 0.5)
+            logo_width = int(uno_logo_original.get_width() * (logo_height / uno_logo_original.get_height()))
+            cached_assets['uno_logo_scaled'] = pygame.transform.scale(uno_logo_original, (logo_width, logo_height))
+            cached_assets['logo_rect'] = cached_assets['uno_logo_scaled'].get_rect(center=(current_width / 2, current_height * 0.35))
+
+            credit_font_size = int(current_height * 0.04)
+            cached_assets['credit_font'] = load_font_by_type('credit', credit_font_size)
+
+            button_width = int(current_width * 0.25)
+            button_height = int(current_height * 0.12)
+            button_x = current_width / 2 - button_width / 2
+            button_y = current_height * 0.7 - button_height / 2
+            cached_assets['start_button'] = pygame.Rect(button_x, button_y, button_width, button_height)
+
+            start_font_size = int(button_height * 0.6)
+            cached_assets['start_font'] = load_font_by_type('start_button', start_font_size)
+
+            last_width, last_height = current_width, current_height
+
+        uno_logo_scaled = cached_assets['uno_logo_scaled']
+        logo_rect = cached_assets['logo_rect']
+        credit_font = cached_assets['credit_font']
+        start_button = cached_assets['start_button']
+        start_font = cached_assets['start_font']
+
         screen.fill(BLACK)
+
         screen.blit(uno_logo_scaled, logo_rect)
 
         draw_text("by Group 19", credit_font, WHITE, screen, current_width / 2, current_height * 0.95)
@@ -284,22 +287,35 @@ def main_game_ui(game):
     uno_qte_duration = 3.0  # 3 seconds to call UNO
     uno_qte_button_rect = None
 
-    # Cached surfaces
-    cached_status_bg_surface = None
-    cached_status_bg_size = None
+    # Cache variables
+    last_width, last_height = 0, 0
+    cached_assets = {}
 
     while running:
         current_width, current_height = screen.get_width(), screen.get_height()
 
-        card_width = int(current_width * 0.06)
-        card_height = int(card_width * 1.45)
-        CARD_IMAGES = load_card_images(card_width, card_height)
-        
-        status_font = load_font_by_type('status', int(current_height * 0.03))
-        button_font = load_font_by_type('button', int(current_height * 0.035))
-        uno_font_size = int(current_height * 0.04)
-        uno_button_font = load_font_by_type('button', uno_font_size)
-        winner_font = load_font_by_type('winner', int(current_height * 0.05))
+        if current_width != last_width or current_height != last_height:
+            card_width = int(current_width * 0.06)
+            card_height = int(card_width * 1.45)
+            cached_assets['card_width'] = card_width
+            cached_assets['card_height'] = card_height
+            cached_assets['CARD_IMAGES'] = load_card_images(card_width, card_height)
+
+            cached_assets['status_font'] = load_font_by_type('status', int(current_height * 0.03))
+            cached_assets['button_font'] = load_font_by_type('button', int(current_height * 0.035))
+            uno_font_size = int(current_height * 0.04)
+            cached_assets['uno_button_font'] = load_font_by_type('button', uno_font_size)
+            cached_assets['winner_font'] = load_font_by_type('winner', int(current_height * 0.05))
+
+            last_width, last_height = current_width, current_height
+
+        card_width = cached_assets['card_width']
+        card_height = cached_assets['card_height']
+        CARD_IMAGES = cached_assets['CARD_IMAGES']
+        status_font = cached_assets['status_font']
+        button_font = cached_assets['button_font']
+        uno_button_font = cached_assets['uno_button_font']
+        winner_font = cached_assets['winner_font']
 
         mouse_pos = pygame.mouse.get_pos()
         current_time = time.time()
